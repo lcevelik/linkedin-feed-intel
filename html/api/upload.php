@@ -58,7 +58,7 @@ try {
 
     // Read API key from .env file
     $apiKey = '';
-    $envFile = __DIR__ . '/.env';
+    $envFile = __DIR__ . '/../../data/.env';
     if (file_exists($envFile)) {
         foreach (file($envFile, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) as $line) {
             if (strpos($line, 'OPENROUTER_API_KEY=') === 0) {
