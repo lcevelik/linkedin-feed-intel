@@ -104,33 +104,29 @@ function extractTextFromImage($imageData) {
     $b64 = base64_encode($imageData);
 
     // Focused OCR prompt — asks for verbatim text, not a description
-    $prompt = 'Read and list ALL text visible in this image exactly as written. '
-            . 'Include: the person\'s name, job title, company, the full post text word for word, '
-            . 'any URLs (https://...), hashtags (#tag), email addresses, and bullet points. '
-            . 'Output only the raw text you can read. Do not describe the image.';
+    $prompt = 'What do you see?';
 
     // Try vision models in order of OCR quality
     // gemma4:e2b — modern multimodal with native vision encoder, good at reading text
     // minicpm-v  — document/OCR-specialist with CLIP encoder
     // moondream  — small fallback; works but prone to hallucination
-    $visionModels = ['gemma4:e2b', 'minicpm-v', 'moondream'];
+    $visionModels = ['moondream'];
 
     foreach ($visionModels as $model) {
         $text = callVisionModel($model, $b64, $prompt);
         if (!$text) continue;
 
         // Accept result if it looks like actual OCR text, not an image description
-        if (!looksLikeDescription($text) && strlen($text) > 20) {
+        if (strlen($text) > 20 && !preg_match('/^\[?[\d\.]+/', $text)) {
             error_log("OCR OK [$model]: " . substr($text, 0, 300));
             return $text;
         }
+        error_log("OCR rejected [$model]: " . substr($text, 0, 100));
+        continue;
 
-        // moondream returned a description — keep as last-resort fallback
-        error_log("OCR description from [$model]: " . substr($text, 0, 200));
-        $descriptionFallback = $text;
     }
 
-    return $descriptionFallback ?? null;
+    return null;
 }
 
 function callVisionModel($model, $b64, $prompt) {
@@ -139,7 +135,7 @@ function callVisionModel($model, $b64, $prompt) {
         'prompt'  => $prompt,
         'images'  => [$b64],
         'stream'  => false,
-        'options' => ['temperature' => 0.0, 'num_predict' => 700]
+        'options' => ['temperature' => 0.1, 'num_predict' => 512]
     ];
 
     $ch = curl_init(OLLAMA_URL . '/api/generate');
@@ -295,89 +291,24 @@ function validateCat($cat) {
 
 
 // ══════════════════════════════════════════════════════════════════════
-// FALLBACK: Regex parsing when LLM structuring is unavailable
+// FALLBACK: Smart regex parsing for LinkedIn OCR text
 // ══════════════════════════════════════════════════════════════════════
 
-function buildCardFromRawText($text) {
-    return [
-        'source'  => extractSourceFromText($text),
-        'cat'     => detectCategory($text),
-        'summary' => buildSummaryFromText($text),
-        'bullets' => extractBulletsFromText($text),
-        'links'   => extractLinksFromText($text),
-    ];
-}
-
-function extractSourceFromText($text) {
-    // "Name · Title" or "Name | Title"
-    if (preg_match('/([A-Z][a-z]+(?:\s+[A-Z][a-z]+)+)\s*[·|]\s*(.{5,60})/', $text, $m)) {
-        return trim($m[1]) . ' · ' . trim($m[2]);
-    }
-    // "by/from Name"
-    if (preg_match('/(?:by|from|posted by)\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)+)/i', $text, $m)) {
-        return $m[1];
-    }
-    // First proper name-like string
-    if (preg_match('/([A-Z][a-z]+ [A-Z][a-z]+)/', $text, $m)) {
-        return $m[1];
-    }
-    return 'User Upload';
-}
 
 function detectCategory($text) {
     $t = strtolower($text);
-    if (preg_match('/gaussian|splat|3dgs|4dgs|nerf|point.?cloud|colmap|mesh|3d.?reconstruct/i', $t)) return '3dgs';
-    if (preg_match('/virtual.?prod|unreal|led.?stage|icvfx|in.?camera|ndisplay|volume|stagecraft/i', $t))  return 'vp';
-    if (preg_match('/comfyui|blender|unity|houdini|plugin|sdk|github|tool|software|app\b/i', $t))          return 'tools';
-    if (preg_match('/\bdm\b|message|connect|networking|met at|follow|endorse/i', $t))                      return 'contact';
+    if (preg_match('/gaussian|splat|3dgs|4dgs|nerf|point.?cloud|colmap|mesh|3d.?reconstruct|gaussiansplatting/i', $t)) return '3dgs';
+    if (preg_match('/virtual.?prod|unreal|led.?stage|icvfx|in.?camera|ndisplay|volume|stagecraft|vp\b/i', $t)) return 'vp';
+    if (preg_match('/comfyui|blender|unity|houdini|plugin|sdk|github|tool|software|app\b/i', $t)) return 'tools';
+    if (preg_match('/\bdm\b|message|connect|networking|met at|follow|endorse|contact/i', $t)) return 'contact';
     return 'ai';
-}
-
-function buildSummaryFromText($text) {
-    // Take first 1-2 meaningful sentences, skipping short/noise lines
-    $lines = preg_split('/\n+/', trim($text));
-    $content = [];
-    foreach ($lines as $line) {
-        $line = trim($line);
-        if (strlen($line) > 30 && !preg_match('/^(https?:|#|@|\d+\s*(likes?|comments?))/i', $line)) {
-            $content[] = $line;
-            if (count($content) >= 2) break;
-        }
-    }
-    return implode(' ', $content) ?: substr($text, 0, 200);
-}
-
-function extractBulletsFromText($text) {
-    $bullets = [];
-    // Lines starting with bullet chars or dashes
-    $lines = preg_split('/\n+/', $text);
-    foreach ($lines as $line) {
-        $line = trim($line);
-        if (preg_match('/^[•\-\*▪➤►]\s+(.+)/', $line, $m) && strlen($m[1]) > 10) {
-            $bullets[] = $m[1];
-        }
-        if (count($bullets) >= 5) break;
-    }
-
-    if (empty($bullets)) {
-        // Fall back to mid-length lines as implicit bullets
-        foreach ($lines as $line) {
-            $line = trim($line);
-            if (strlen($line) > 20 && strlen($line) < 150 && !preg_match('/^https?:/', $line)) {
-                $bullets[] = $line;
-            }
-            if (count($bullets) >= 4) break;
-        }
-    }
-
-    return $bullets;
 }
 
 function extractLinksFromText($text) {
     $links = [];
     if (preg_match_all('/(https?:\/\/[^\s<>"\')\]]+)/i', $text, $m)) {
         foreach ($m[1] as $url) {
-            $url  = rtrim($url, '.,;:)');
+            $url = rtrim($url, '.,;:)');
             $host = parse_url($url, PHP_URL_HOST) ?: $url;
             $links[] = ['l' => $host, 'u' => $url, 't' => ''];
         }
@@ -388,5 +319,126 @@ function extractLinksFromText($text) {
         }
     }
     return $links;
+}
+
+function buildCardFromRawText($text) {
+    // Step 1: Clean the OCR text — remove UI noise
+    $clean = cleanOcrText($text);
+
+    // Step 2: Extract structured fields
+    $source  = extractAuthorFromClean($clean);
+    $cat     = detectCategory($clean['full']);
+    $summary = buildSummaryFromClean($clean);
+    $bullets = extractBulletsFromClean($clean);
+    $links   = extractLinksFromText($clean['full']);
+
+    return compact('source', 'cat', 'summary', 'bullets', 'links');
+}
+
+function cleanOcrText($text) {
+    $lines = preg_split('/\n+/', $text);
+    $clean = [];
+
+    // Patterns to skip (phone UI, LinkedIn nav, engagement metrics)
+    $skipPatterns = [
+        '/^\d{1,2}:\d{2}/',                    // time "5:35"
+        '/^[\d\s+]+$/',                         // signal "5G+ 1 59"
+        '/^(Home|Video|My Net|Notificat|Jobs|Search|Me|Sign|Log|Post|Messag|Netwo)/i',
+        '/^(Like|Comment|Share|Repost|Send)/i',
+        '/^\d+[kKmM]?\s*(likes?|comments?|reposts?)/i',
+        '/^(Follow|Connect|Accept|Message|More)/i',
+        '/^\d+ (views?|impressions?)/i',
+        '/^(Suggested|Promoted|Sponsored|Ad)/i',
+        '/^(All|Recent|Top|My )/i',
+        '/^\d+[km]?$/i',                         // just a number
+        '/^[·•\-\*]\s*$/',                     // empty bullets
+    ];
+
+    foreach ($lines as $line) {
+        $line = trim($line);
+        if (empty($line)) continue;
+
+        $skip = false;
+        foreach ($skipPatterns as $pat) {
+            if (preg_match($pat, $line)) {
+                $skip = true;
+                break;
+            }
+        }
+        if (!$skip) {
+            $clean[] = $line;
+        }
+    }
+
+    return [
+        'lines' => $clean,
+        'full'  => implode('\n', $clean),
+    ];
+}
+
+function extractAuthorFromClean($clean) {
+    $full = $clean['full'];
+
+    // Pattern: "addressed to/from/by Name"
+    if (preg_match('/(?:addressed to|from|by|posted by|written by|sent by)\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)+)/i', $full, $m)) {
+        return $m[1];
+    }
+
+    // Pattern: "Name, a/an ... at Company"
+    if (preg_match('/([A-Z][a-z]+(?:\s+[A-Z][a-z]+)+),?\s+(?:a|an|the)\s+\w+\s+at\s+([A-Z][a-zA-Z0-9.\s]+)/i', $full, $m)) {
+        return $m[1] . ' · ' . trim($m[2]);
+    }
+
+    // Pattern: "Name · Title" or "Name | Title"
+    if (preg_match('/([A-Z][a-z]+(?:\s+[A-Z][a-z]+)+)\s*[·|]\s*(.{5,60})/', $full, $m)) {
+        return trim($m[1]) . ' · ' . trim($m[2]);
+    }
+
+    // Pattern: "Title at Company" (only if title is short, not a full sentence)
+    if (preg_match('/^([A-Z][a-z]+(?:\s+[A-Z][a-z]+){0,3})\s+at\s+([A-Z][a-zA-Z0-9.]+)/i', trim($full), $m)) {
+        return $m[1] . ' · ' . trim($m[2]);
+    }
+
+    return 'User Upload';
+}
+
+function buildSummaryFromClean($clean) {
+    $lines = $clean['lines'];
+    $content = [];
+
+    // Skip lines that look like names, job titles, or timestamps
+    foreach ($lines as $line) {
+        $line = trim($line);
+        if (strlen($line) < 20) continue;
+        if (preg_match('/^[A-Z][a-z]+(?:\s+[A-Z][a-z]+){1,3}$/', $line)) continue; // name
+        if (preg_match('/\s+at\s+/i', $line) && strlen($line) < 60) continue; // job title
+        if (preg_match('/^#/', $line)) continue; // hashtags
+        if (preg_match('/^https?:/', $line)) continue; // URLs
+
+        $content[] = $line;
+        if (count($content) >= 2) break;
+    }
+
+    return implode(' ', $content) ?: substr($clean['full'], 0, 200);
+}
+
+function extractBulletsFromClean($clean) {
+    $lines = $clean['lines'];
+    $bullets = [];
+
+    foreach ($lines as $line) {
+        $line = trim($line);
+        // Skip very short, names, job titles, hashtags
+        if (strlen($line) < 15) continue;
+        if (preg_match('/^[A-Z][a-z]+(?:\s+[A-Z][a-z]+){1,3}$/', $line)) continue;
+        if (preg_match('/\s+at\s+/i', $line) && strlen($line) < 60) continue;
+        if (preg_match('/^#/', $line)) continue;
+        if (preg_match('/^https?:/', $line)) continue;
+
+        $bullets[] = $line;
+        if (count($bullets) >= 4) break;
+    }
+
+    return $bullets;
 }
 ?>
