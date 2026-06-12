@@ -633,7 +633,7 @@ function renderCards() {
 }
 
 function renderCardHTML(p) {
-  const thumb = p.img ? `<div class="cthumb-wrap"><img class="cthumb" src="${p.img}" alt=""></div>` : '';
+  const thumb = '';
   const lnks  = (p.links||[]).map(l=>`<a class="lnk ${l.t||''}" href="${l.u}" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation()"><svg width="9" height="9" viewBox="0 0 10 10" fill="none" style="flex-shrink:0"><path d="M1 9L9 1M9 1H4M9 1V6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg> ${l.l}</a>`).join('');
   const buls  = (p.bullets||[]).slice(0,3).map(b=>`<li>${b}</li>`).join('');
   return `<div class="card ${catCls(p.cat)}" onclick="openCard('${p.id}')">
@@ -661,7 +661,7 @@ window.toggleMonth = function(mk) {
 // ── MODAL ──────────────────────────────────────────────────────────
 function openCard(id) {
   const p = posts.find(x=>x.id===id); if(!p) return;
-  const img   = p.img ? `<img class="mimg" src="${p.img}" alt="">` : '';
+  const img   = '';
   const lnks  = (p.links||[]).map(l=>`<a class="lnk ${l.t||''}" href="${l.u}" target="_blank" rel="noopener noreferrer"><svg width="9" height="9" viewBox="0 0 10 10" fill="none" style="flex-shrink:0"><path d="M1 9L9 1M9 1H4M9 1V6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg> ${l.l}</a>`).join('');
   const buls  = (p.bullets||[]).map(b=>`<li>${b}</li>`).join('');
   document.getElementById('mbody').innerHTML = `${img}
