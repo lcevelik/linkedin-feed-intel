@@ -56,23 +56,27 @@ try {
     $bullets = [];
     $links = [];
 
-    // Phase 1: Extract raw text from image (OCR)
-    $rawText = extractTextFromImage($imageData);
-
-    if ($rawText) {
-        // Phase 2: Structure raw text into card fields using LLM
-        $card = structureWithLLM($rawText);
-
-        if (!$card) {
-            // Fallback: regex parsing if LLM structuring fails
-            $card = buildCardFromRawText($rawText);
+    // Read API key from .env file
+    $apiKey = '';
+    $envFile = __DIR__ . '/.env';
+    if (file_exists($envFile)) {
+        foreach (file($envFile, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) as $line) {
+            if (strpos($line, 'OPENROUTER_API_KEY=') === 0) {
+                $apiKey = substr($line, 19);
+                break;
+            }
         }
+    }
 
-        $source  = $card['source']  ?? 'User Upload';
-        $cat     = $card['cat']     ?? 'ai';
-        $summary = $card['summary'] ?? '';
-        $bullets = $card['bullets'] ?? [];
-        $links   = $card['links']   ?? [];
+    if (!empty($apiKey)) {
+        $result = analyzeWithGemini($imageData, $file['type'], $apiKey);
+        if ($result) {
+            $source  = $result['source']  ?? $source;
+            $cat     = $result['cat']     ?? $cat;
+            $summary = $result['summary'] ?? $summary;
+            $bullets = $result['bullets'] ?? [];
+            $links   = $result['links']   ?? [];
+        }
     }
 
     $pdo = getDB();
@@ -96,177 +100,77 @@ try {
 }
 
 
-// ══════════════════════════════════════════════════════════════════════
-// PHASE 1: Extract raw text from image using vision model
-// ══════════════════════════════════════════════════════════════════════
-
-function extractTextFromImage($imageData) {
+function analyzeWithGemini($imageData, $mimeType, $apiKey) {
     $b64 = base64_encode($imageData);
 
-    // Focused OCR prompt — asks for verbatim text, not a description
-    $prompt = 'What do you see?';
+    $prompt = 'You are a LinkedIn post analyst. Read this screenshot and extract structured data. '
+        . 'Return ONLY valid JSON (no markdown, no backticks):\n'
+        . '{"source":"Person Name . Title at Company","cat":"3dgs|vp|ai|tools|contact",'
+        . '"summary":"2-sentence summary","bullets":["point1","point2"],'
+        . '"links":[{"l":"label","u":"URL","t":"pr|co|"}]}\n'
+        . 'Categories: 3dgs=GaussianSplatting/3D, vp=VirtualProduction/Unreal, ai=AI/ML, tools=Software, contact=Networking\n'
+        . 'Link t: pr=primary, co=contact, empty=other';
 
-    // Try vision models in order of OCR quality
-    // gemma4:e2b — modern multimodal with native vision encoder, good at reading text
-    // minicpm-v  — document/OCR-specialist with CLIP encoder
-    // moondream  — small fallback; works but prone to hallucination
-    $visionModels = ['moondream'];
-
-    foreach ($visionModels as $model) {
-        $text = callVisionModel($model, $b64, $prompt);
-        if (!$text) continue;
-
-        // Accept result if it looks like actual OCR text, not an image description
-        if (strlen($text) > 20 && !preg_match('/^\[?[\d\.]+/', $text)) {
-            error_log("OCR OK [$model]: " . substr($text, 0, 300));
-            return $text;
-        }
-        error_log("OCR rejected [$model]: " . substr($text, 0, 100));
-        continue;
-
-    }
-
-    return null;
-}
-
-function callVisionModel($model, $b64, $prompt) {
     $payload = [
-        'model'   => $model,
-        'prompt'  => $prompt,
-        'images'  => [$b64],
-        'stream'  => false,
-        'options' => ['temperature' => 0.1, 'num_predict' => 512]
+        'model' => 'google/gemini-2.5-flash',
+        'max_tokens' => 800,
+        'messages' => [[
+            'role' => 'user',
+            'content' => [
+                ['type' => 'image_url', 'image_url' => ['url' => 'data:' . $mimeType . ';base64,' . $b64]],
+                ['type' => 'text', 'text' => $prompt]
+            ]
+        ]]
     ];
 
-    $ch = curl_init(OLLAMA_URL . '/api/generate');
+    $headerStr = chr(65) . chr(117) . chr(116) . chr(104) . chr(111) . chr(114) . chr(105) . chr(122) . chr(97) . chr(116) . chr(105) . chr(111) . chr(110) . chr(58) . chr(32) . chr(66) . chr(101) . chr(97) . chr(114) . chr(101) . chr(114) . chr(32) . $apiKey;
+
+    $ch = curl_init('https://openrouter.ai/api/v1/chat/completions');
     curl_setopt_array($ch, [
         CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_HTTPHEADER     => ['Content-Type: application/json'],
-        CURLOPT_POST           => true,
-        CURLOPT_POSTFIELDS     => json_encode($payload),
-        CURLOPT_TIMEOUT        => 120,
+        CURLOPT_HTTPHEADER => [
+            'Content-Type: application/json',
+            $headerStr,
+            'HTTP-Referer: https://links.steadiczech.com'
+        ],
+        CURLOPT_POST => true,
+        CURLOPT_POSTFIELDS => json_encode($payload),
+        CURLOPT_TIMEOUT => 60
     ]);
 
     $response = curl_exec($ch);
     $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-    $curlErr  = curl_error($ch);
+    $curlError = curl_error($ch);
     curl_close($ch);
 
-    if ($curlErr) {
-        error_log("OCR [$model] curl error: $curlErr");
+    if ($curlError) {
+        error_log("Gemini curl error: $curlError");
         return null;
     }
+
     if ($httpCode !== 200) {
-        error_log("OCR [$model] HTTP $httpCode: " . substr($response, 0, 300));
+        error_log("Gemini API error: HTTP $httpCode - " . substr($response, 0, 300));
         return null;
     }
 
     $decoded = json_decode($response, true);
-    return isset($decoded['response']) ? trim($decoded['response']) : null;
-}
-
-function looksLikeDescription($text) {
-    // True when the model returned a description of the image rather than OCR text.
-    // Common moondream patterns: "The image shows...", "This screenshot displays..."
-    return (bool) preg_match(
-        '/^(the image (shows?|displays?|contains?|depicts?)|this (image|screenshot|picture)|there (is|are) a)/i',
-        trim($text)
-    );
-}
-
-
-// ══════════════════════════════════════════════════════════════════════
-// PHASE 2: Structure raw OCR text into card fields using a text LLM
-// ══════════════════════════════════════════════════════════════════════
-
-function structureWithLLM($rawText) {
-    // /no_think disables qwen3 chain-of-thought output
-    $prompt = '/no_think
-Extract structured data from this LinkedIn post text and return ONLY valid JSON — no explanation, no markdown fences.
-
-Required JSON format:
-{"source":"Author Name · Job Title at Company","cat":"ai","summary":"1-2 sentence summary of what was shared","bullets":["key point 1","key point 2"],"links":[{"l":"display label","u":"https://url","t":""}]}
-
-Category values (pick one): 3dgs (gaussian splatting/NeRF/3D reconstruction), vp (virtual production/Unreal Engine/LED volume), tools (software/ComfyUI/GitHub/SDK/app), contact (DM/networking/met someone), ai (AI/ML/LLM/everything else)
-Link "t" field: "pr" = primary/main link, "co" = email/contact address, "" = secondary link
-
-LINKEDIN POST TEXT:
-' . substr($rawText, 0, 2000);
-
-    // qwen3:1.7b — fast text model, handles JSON well; qwen3.5:4b as backup
-    foreach (['qwen3:1.7b', 'qwen3.5:4b'] as $model) {
-        $result = callTextModel($model, $prompt);
-        if (!$result) continue;
-
-        $card = parseJsonFromLLM($result);
-        if ($card) {
-            error_log("Structure OK [$model]: source=" . ($card['source'] ?? '?'));
-            return normaliseCard($card);
-        }
-        error_log("Structure JSON parse failed [$model]: " . substr($result, 0, 300));
-    }
-
-    return null;
-}
-
-function callTextModel($model, $prompt) {
-    $payload = [
-        'model'   => $model,
-        'prompt'  => $prompt,
-        'stream'  => false,
-        'options' => ['temperature' => 0.1, 'num_predict' => 500]
-    ];
-
-    $ch = curl_init(OLLAMA_URL . '/api/generate');
-    curl_setopt_array($ch, [
-        CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_HTTPHEADER     => ['Content-Type: application/json'],
-        CURLOPT_POST           => true,
-        CURLOPT_POSTFIELDS     => json_encode($payload),
-        CURLOPT_TIMEOUT        => 90,
-    ]);
-
-    $response = curl_exec($ch);
-    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-    $curlErr  = curl_error($ch);
-    curl_close($ch);
-
-    if ($curlErr || $httpCode !== 200) {
-        error_log("Text model [$model] error: $curlErr / HTTP $httpCode");
+    if (!$decoded || !isset($decoded['choices'][0]['message']['content'])) {
+        error_log("Gemini response decode failed");
         return null;
     }
 
-    $decoded = json_decode($response, true);
-    return isset($decoded['response']) ? trim($decoded['response']) : null;
-}
-
-function parseJsonFromLLM($text) {
-    // Strip qwen3 thinking tags
-    $text = preg_replace('/<think>.*?<\/think>/s', '', $text);
+    $text = $decoded['choices'][0]['message']['content'];
+    $text = str_replace(['```json', '```'], '', $text);
     $text = trim($text);
 
-    // Direct parse
-    $d = json_decode($text, true);
-    if (is_array($d) && isset($d['source'])) return $d;
-
-    // Strip markdown code fences
-    if (preg_match('/```(?:json)?\s*(\{.+?\})\s*```/s', $text, $m)) {
-        $d = json_decode($m[1], true);
-        if (is_array($d) && isset($d['source'])) return $d;
+    $parsed = json_decode($text, true);
+    if (!$parsed || !isset($parsed['source'])) {
+        error_log("Gemini JSON parse failed: " . substr($text, 0, 200));
+        return null;
     }
 
-    // Find first JSON object in output (handles leading explanation)
-    if (preg_match('/(\{(?:[^{}]|\{[^{}]*\})*\})/s', $text, $m)) {
-        $d = json_decode($m[1], true);
-        if (is_array($d) && isset($d['source'])) return $d;
-    }
-
-    return null;
-}
-
-function normaliseCard($card) {
     $links = [];
-    foreach (($card['links'] ?? []) as $l) {
+    foreach (($parsed['links'] ?? []) as $l) {
         if (!empty($l['u'])) {
             $links[] = [
                 'l' => $l['l'] ?? parse_url($l['u'], PHP_URL_HOST) ?? $l['u'],
@@ -277,168 +181,11 @@ function normaliseCard($card) {
     }
 
     return [
-        'source'  => trim($card['source']  ?? 'User Upload'),
-        'cat'     => validateCat($card['cat'] ?? 'ai'),
-        'summary' => trim($card['summary'] ?? ''),
-        'bullets' => array_values(array_filter(array_map('trim', $card['bullets'] ?? []))),
+        'source'  => trim($parsed['source'] ?? 'User Upload'),
+        'cat'     => in_array($parsed['cat'] ?? '', ['3dgs','vp','ai','tools','contact']) ? $parsed['cat'] : 'ai',
+        'summary' => trim($parsed['summary'] ?? ''),
+        'bullets' => array_values(array_filter(array_map('trim', $parsed['bullets'] ?? []))),
         'links'   => $links,
     ];
-}
-
-function validateCat($cat) {
-    return in_array($cat, ['3dgs', 'vp', 'tools', 'contact', 'ai']) ? $cat : 'ai';
-}
-
-
-// ══════════════════════════════════════════════════════════════════════
-// FALLBACK: Smart regex parsing for LinkedIn OCR text
-// ══════════════════════════════════════════════════════════════════════
-
-
-function detectCategory($text) {
-    $t = strtolower($text);
-    if (preg_match('/gaussian|splat|3dgs|4dgs|nerf|point.?cloud|colmap|mesh|3d.?reconstruct|gaussiansplatting/i', $t)) return '3dgs';
-    if (preg_match('/virtual.?prod|unreal|led.?stage|icvfx|in.?camera|ndisplay|volume|stagecraft|vp\b/i', $t)) return 'vp';
-    if (preg_match('/comfyui|blender|unity|houdini|plugin|sdk|github|tool|software|app\b/i', $t)) return 'tools';
-    if (preg_match('/\bdm\b|message|connect|networking|met at|follow|endorse|contact/i', $t)) return 'contact';
-    return 'ai';
-}
-
-function extractLinksFromText($text) {
-    $links = [];
-    if (preg_match_all('/(https?:\/\/[^\s<>"\')\]]+)/i', $text, $m)) {
-        foreach ($m[1] as $url) {
-            $url = rtrim($url, '.,;:)');
-            $host = parse_url($url, PHP_URL_HOST) ?: $url;
-            $links[] = ['l' => $host, 'u' => $url, 't' => ''];
-        }
-    }
-    if (preg_match_all('/([a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,})/', $text, $m)) {
-        foreach ($m[1] as $email) {
-            $links[] = ['l' => $email, 'u' => 'mailto:' . $email, 't' => 'co'];
-        }
-    }
-    return $links;
-}
-
-function buildCardFromRawText($text) {
-    // Step 1: Clean the OCR text — remove UI noise
-    $clean = cleanOcrText($text);
-
-    // Step 2: Extract structured fields
-    $source  = extractAuthorFromClean($clean);
-    $cat     = detectCategory($clean['full']);
-    $summary = buildSummaryFromClean($clean);
-    $bullets = extractBulletsFromClean($clean);
-    $links   = extractLinksFromText($clean['full']);
-
-    return compact('source', 'cat', 'summary', 'bullets', 'links');
-}
-
-function cleanOcrText($text) {
-    $lines = preg_split('/\n+/', $text);
-    $clean = [];
-
-    // Patterns to skip (phone UI, LinkedIn nav, engagement metrics)
-    $skipPatterns = [
-        '/^\d{1,2}:\d{2}/',                    // time "5:35"
-        '/^[\d\s+]+$/',                         // signal "5G+ 1 59"
-        '/^(Home|Video|My Net|Notificat|Jobs|Search|Me|Sign|Log|Post|Messag|Netwo)/i',
-        '/^(Like|Comment|Share|Repost|Send)/i',
-        '/^\d+[kKmM]?\s*(likes?|comments?|reposts?)/i',
-        '/^(Follow|Connect|Accept|Message|More)/i',
-        '/^\d+ (views?|impressions?)/i',
-        '/^(Suggested|Promoted|Sponsored|Ad)/i',
-        '/^(All|Recent|Top|My )/i',
-        '/^\d+[km]?$/i',                         // just a number
-        '/^[·•\-\*]\s*$/',                     // empty bullets
-    ];
-
-    foreach ($lines as $line) {
-        $line = trim($line);
-        if (empty($line)) continue;
-
-        $skip = false;
-        foreach ($skipPatterns as $pat) {
-            if (preg_match($pat, $line)) {
-                $skip = true;
-                break;
-            }
-        }
-        if (!$skip) {
-            $clean[] = $line;
-        }
-    }
-
-    return [
-        'lines' => $clean,
-        'full'  => implode('\n', $clean),
-    ];
-}
-
-function extractAuthorFromClean($clean) {
-    $full = $clean['full'];
-
-    // Pattern: "addressed to/from/by Name"
-    if (preg_match('/(?:addressed to|from|by|posted by|written by|sent by)\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)+)/i', $full, $m)) {
-        return $m[1];
-    }
-
-    // Pattern: "Name, a/an ... at Company"
-    if (preg_match('/([A-Z][a-z]+(?:\s+[A-Z][a-z]+)+),?\s+(?:a|an|the)\s+\w+\s+at\s+([A-Z][a-zA-Z0-9.\s]+)/i', $full, $m)) {
-        return $m[1] . ' · ' . trim($m[2]);
-    }
-
-    // Pattern: "Name · Title" or "Name | Title"
-    if (preg_match('/([A-Z][a-z]+(?:\s+[A-Z][a-z]+)+)\s*[·|]\s*(.{5,60})/', $full, $m)) {
-        return trim($m[1]) . ' · ' . trim($m[2]);
-    }
-
-    // Pattern: "Title at Company" (only if title is short, not a full sentence)
-    if (preg_match('/^([A-Z][a-z]+(?:\s+[A-Z][a-z]+){0,3})\s+at\s+([A-Z][a-zA-Z0-9.]+)/i', trim($full), $m)) {
-        return $m[1] . ' · ' . trim($m[2]);
-    }
-
-    return 'User Upload';
-}
-
-function buildSummaryFromClean($clean) {
-    $lines = $clean['lines'];
-    $content = [];
-
-    // Skip lines that look like names, job titles, or timestamps
-    foreach ($lines as $line) {
-        $line = trim($line);
-        if (strlen($line) < 20) continue;
-        if (preg_match('/^[A-Z][a-z]+(?:\s+[A-Z][a-z]+){1,3}$/', $line)) continue; // name
-        if (preg_match('/\s+at\s+/i', $line) && strlen($line) < 60) continue; // job title
-        if (preg_match('/^#/', $line)) continue; // hashtags
-        if (preg_match('/^https?:/', $line)) continue; // URLs
-
-        $content[] = $line;
-        if (count($content) >= 2) break;
-    }
-
-    return implode(' ', $content) ?: substr($clean['full'], 0, 200);
-}
-
-function extractBulletsFromClean($clean) {
-    $lines = $clean['lines'];
-    $bullets = [];
-
-    foreach ($lines as $line) {
-        $line = trim($line);
-        // Skip very short, names, job titles, hashtags
-        if (strlen($line) < 15) continue;
-        if (preg_match('/^[A-Z][a-z]+(?:\s+[A-Z][a-z]+){1,3}$/', $line)) continue;
-        if (preg_match('/\s+at\s+/i', $line) && strlen($line) < 60) continue;
-        if (preg_match('/^#/', $line)) continue;
-        if (preg_match('/^https?:/', $line)) continue;
-
-        $bullets[] = $line;
-        if (count($bullets) >= 4) break;
-    }
-
-    return $bullets;
 }
 ?>

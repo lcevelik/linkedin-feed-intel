@@ -9,3 +9,9 @@ RewriteEngine On
 
 # Allow direct access to api directory for AJAX calls
 RewriteRule ^api/.* - [L]
+
+# Protect .env file
+<FilesMatch "^\.env$">
+    Order allow,deny
+    Deny from all
+</FilesMatch>
