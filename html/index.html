@@ -934,6 +934,20 @@ async function handleFiles(files) {
   window.openCard = openCard;
   window.delCard  = delCard;
 
+  // Load posts from API (merge with seed)
+  fetch('/api/posts.php')
+    .then(r => r.json())
+    .then(dbPosts => {
+      if (Array.isArray(dbPosts) && dbPosts.length) {
+        // Merge: DB posts take priority, seed posts fill gaps
+        const dbIds = new Set(dbPosts.map(p => p.id));
+        const seedOnly = SEED.filter(p => !dbIds.has(p.id));
+        posts = [...dbPosts, ...seedOnly];
+        render();
+      }
+    })
+    .catch(err => console.warn('Failed to load posts from API:', err));
+
   render();
 })();
 </script>
