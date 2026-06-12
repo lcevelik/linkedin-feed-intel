@@ -20,3 +20,4 @@ Thumbs.db
 *.swo
 *~
 html/api/.env
+data/.env
