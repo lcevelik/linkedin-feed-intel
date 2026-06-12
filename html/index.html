@@ -25,8 +25,15 @@ header{padding:2rem 0 1.4rem;border-bottom:1px solid var(--bd);display:flex;alig
 .hstat-n{font-family:'Space Mono',monospace;font-size:1.4rem;font-weight:700;color:var(--g);line-height:1}
 .hstat-l{font-size:.62rem;color:var(--mu);text-transform:uppercase;letter-spacing:.1em}
 
+/* SEARCH */
+.searchwrap{margin:1.4rem 0 .8rem;position:relative}
+.searchwrap svg{position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--mu);pointer-events:none}
+#searchInput{width:100%;padding:10px 14px 10px 38px;background:var(--surf);border:1px solid var(--bd);border-radius:4px;color:var(--tx);font-family:'Space Mono',monospace;font-size:.75rem;outline:none;transition:border-color .2s}
+#searchInput:focus{border-color:var(--b)}
+#searchInput::placeholder{color:var(--mu)}
+
 /* UPLOAD */
-.upzone{margin:1.4rem 0;border:1px dashed var(--bd2);border-radius:6px;padding:1.3rem 1.6rem;display:flex;align-items:center;gap:1.1rem;cursor:pointer;transition:all .2s;background:var(--surf)}
+.upzone{margin:0 0 1.4rem;border:1px dashed var(--bd2);border-radius:6px;padding:1.3rem 1.6rem;display:flex;align-items:center;gap:1.1rem;cursor:pointer;transition:all .2s;background:var(--surf)}
 .upzone:hover,.upzone.drag{border-color:var(--g);background:rgba(0,255,163,.03)}
 .upzone input{display:none}
 .upicon{width:38px;height:38px;border:1px solid var(--bd2);border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:1.1rem;flex-shrink:0;transition:border-color .2s}
@@ -34,17 +41,39 @@ header{padding:2rem 0 1.4rem;border-bottom:1px solid var(--bd);display:flex;alig
 .uptxt strong{display:block;font-size:.88rem;color:#fff;margin-bottom:.18rem}
 .uptxt span{font-family:'Space Mono',monospace;font-size:.6rem;color:var(--mu);text-transform:uppercase;letter-spacing:.1em}
 
-/* ANALYZING BAR */
-#abar{display:none;align-items:center;gap:.8rem;padding:.75rem 1.1rem;background:rgba(0,255,163,.05);border:1px solid rgba(0,255,163,.15);border-radius:4px;margin-bottom:.9rem;font-family:'Space Mono',monospace;font-size:.68rem;color:var(--g)}
-#abar.on{display:flex}
-.pdot{width:8px;height:8px;border-radius:50%;background:var(--g);animation:pulse 1s ease-in-out infinite}
-@keyframes pulse{0%,100%{opacity:1}50%{opacity:.2}}
+/* BATCH UPLOAD PANEL */
+#batchPanel{display:none;margin-bottom:1rem;background:var(--surf);border:1px solid var(--bd);border-radius:6px;overflow:hidden;animation:slideDown .25s ease}
+#batchPanel.on{display:block}
+@keyframes slideDown{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:none}}
+.batch-header{padding:.85rem 1.1rem;border-bottom:1px solid var(--bd);display:flex;align-items:center;justify-content:space-between}
+.batch-header-left{display:flex;align-items:center;gap:.65rem}
+.batch-header h3{font-family:'Space Mono',monospace;font-size:.68rem;text-transform:uppercase;letter-spacing:.1em;color:var(--mu2)}
+.batch-counter{font-family:'Space Mono',monospace;font-size:.6rem;color:var(--g);background:rgba(0,255,163,.08);border:1px solid rgba(0,255,163,.2);padding:2px 8px;border-radius:2px}
+.batch-counter.done{color:var(--g)}.batch-counter.error{color:var(--r)}
+.batch-close{background:none;border:1px solid var(--bd2);border-radius:3px;color:var(--mu);cursor:pointer;padding:2px 8px;font-size:.6rem;font-family:'Space Mono',monospace;text-transform:uppercase;letter-spacing:.08em;transition:all .2s}
+.batch-close:hover{color:#fff;border-color:var(--mu2)}
+.batch-overall{padding:.5rem 1.1rem;border-bottom:1px solid var(--bd)}
+.batch-bar-track{height:4px;background:var(--bd);border-radius:2px;overflow:hidden}
+.batch-bar-fill{height:100%;background:linear-gradient(90deg,var(--g),var(--b));border-radius:2px;transition:width .3s ease;width:0%}
+.batch-files{max-height:280px;overflow-y:auto;padding:.4rem 0}
+.batch-file{display:flex;align-items:center;gap:.7rem;padding:.45rem 1.1rem;transition:background .15s}
+.batch-file:hover{background:rgba(255,255,255,.015)}
+.batch-file-thumb{width:36px;height:36px;border-radius:3px;border:1px solid var(--bd);object-fit:cover;flex-shrink:0}
+.batch-file-info{flex:1;min-width:0}
+.batch-file-name{font-size:.72rem;color:var(--tx);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.batch-file-status{font-family:'Space Mono',monospace;font-size:.56rem;text-transform:uppercase;letter-spacing:.08em;margin-top:.1rem}
+.batch-file-status.pending{color:var(--mu)}.batch-file-status.processing{color:var(--y)}.batch-file-status.done{color:var(--g)}.batch-file-status.error{color:var(--r)}
+.batch-file-icon{width:20px;height:20px;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:.85rem}
+@keyframes spin{to{transform:rotate(360deg)}}
+.spinner{display:inline-block;width:14px;height:14px;border:2px solid var(--bd);border-top-color:var(--y);border-radius:50%;animation:spin .7s linear infinite}
 
 /* CONTROLS */
 .ctrls{display:flex;align-items:center;gap:.55rem;margin-bottom:1.1rem;flex-wrap:wrap}
-.fbtn{font-family:'Space Mono',monospace;font-size:.6rem;text-transform:uppercase;letter-spacing:.08em;padding:5px 11px;border-radius:2px;border:1px solid var(--bd2);background:transparent;color:var(--mu2);cursor:pointer;transition:all .2s}
+.fbtn{font-family:'Space Mono',monospace;font-size:.6rem;text-transform:uppercase;letter-spacing:.08em;padding:5px 11px;border-radius:2px;border:1px solid var(--bd2);background:transparent;color:var(--mu2);cursor:pointer;transition:all .2s;display:inline-flex;align-items:center;gap:.4rem}
 .fbtn:hover{color:#fff;border-color:var(--mu2)}
 .fbtn.on{color:var(--bg);background:var(--g);border-color:var(--g)}
+.fbtn .cnt{font-size:.52rem;opacity:.7}
+.fbtn.on .cnt{opacity:.9}
 .vtog{margin-left:auto;display:flex;gap:.35rem}
 .vbtn{width:28px;height:28px;border:1px solid var(--bd2);background:transparent;cursor:pointer;display:flex;align-items:center;justify-content:center;border-radius:2px;color:var(--mu);transition:all .2s;font-size:.85rem}
 .vbtn.on,.vbtn:hover{border-color:var(--b);color:var(--b)}
@@ -59,18 +88,35 @@ header{padding:2rem 0 1.4rem;border-bottom:1px solid var(--bd);display:flex;alig
 .bfil{height:100%;border-radius:2px;transition:width .6s cubic-bezier(.4,0,.2,1)}
 .bcnt{font-family:'Space Mono',monospace;font-size:.62rem;color:var(--mu)}
 
-/* GRID */
-#grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:1.1rem}
-#grid.lv{grid-template-columns:1fr}
+/* MASONRY COLUMNS */
+.masonry{display:flex;flex-direction:column;gap:0}
+.datecards{column-count:3;column-gap:1.1rem}
+.datecards.lv{column-count:1}
+@media(max-width:1100px){.datecards{column-count:2}}
+@media(max-width:700px){.datecards{column-count:1}}
+
+/* DATE GROUPS */
+.dategroup{break-inside:avoid;margin-bottom:1.4rem}
+.datehdr{display:flex;align-items:center;gap:.65rem;margin-bottom:.7rem;cursor:pointer;user-select:none;padding:.4rem 0}
+.datehdr:hover .datelbl{color:#fff}
+.datelbl{font-family:'Space Mono',monospace;font-size:.65rem;text-transform:uppercase;letter-spacing:.12em;color:var(--mu2);transition:color .2s}
+.datecnt{font-family:'Space Mono',monospace;font-size:.54rem;color:var(--mu);background:var(--surf2);border:1px solid var(--bd);padding:1px 7px;border-radius:2px}
+.datearrow{color:var(--mu);font-size:.7rem;transition:transform .2s}
+.datearrow.collapsed{transform:rotate(-90deg)}
+.datehdr-line{flex:1;height:1px;background:var(--bd)}
+.datecards{overflow:hidden;transition:max-height .35s ease,opacity .25s ease}
+.datecards.collapsed{max-height:0!important;opacity:0;pointer-events:none}
 
 /* CARD */
-.card{background:var(--surf);border:1px solid var(--bd);border-radius:4px;position:relative;overflow:hidden;cursor:pointer;transition:border-color .2s,transform .2s;animation:cin .35s ease both}
+.card{background:var(--surf);border:1px solid var(--bd);border-radius:4px;position:relative;overflow:hidden;cursor:pointer;transition:border-color .2s,transform .2s;animation:cin .35s ease both;break-inside:avoid;margin-bottom:1.1rem;display:inline-block;width:100%}
 @keyframes cin{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
 .card:hover{transform:translateY(-2px)}
 .card.c3{border-left:2px solid var(--g)}.card.cv{border-left:2px solid var(--b)}.card.ca{border-left:2px solid var(--p)}.card.ct{border-left:2px solid var(--y)}.card.cc{border-left:2px solid var(--r)}
 .card:hover.c3{border-color:var(--g)}.card:hover.cv{border-color:var(--b)}.card:hover.ca{border-color:var(--p)}.card:hover.ct{border-color:var(--y)}.card:hover.cc{border-color:var(--r)}
-.cthumb{width:100%;height:110px;object-fit:cover;object-position:top;display:block;border-bottom:1px solid var(--bd);opacity:.7;transition:opacity .2s}
+.cthumb{width:100%;height:130px;object-fit:cover;object-position:top;display:block;border-bottom:1px solid var(--bd);opacity:.75;transition:opacity .2s}
 .card:hover .cthumb{opacity:1}
+.cthumb-wrap{position:relative;overflow:hidden}
+.cthumb-wrap::after{content:'';position:absolute;inset:0;background:linear-gradient(180deg,transparent 60%,rgba(7,7,13,.6));pointer-events:none}
 .cin{padding:1rem 1.1rem}
 .ctop{display:flex;align-items:flex-start;justify-content:space-between;gap:.55rem;margin-bottom:.6rem}
 .csrc{font-weight:700;font-size:.8rem;color:#fff;line-height:1.2}
@@ -93,7 +139,7 @@ header{padding:2rem 0 1.4rem;border-bottom:1px solid var(--bd);display:flex;alig
 .cdel{position:absolute;top:.45rem;right:.45rem;width:20px;height:20px;background:rgba(255,62,108,.1);border:1px solid rgba(255,62,108,.2);border-radius:2px;color:var(--r);font-size:.65rem;cursor:pointer;display:none;align-items:center;justify-content:center;z-index:5;transition:background .15s;line-height:1}
 .card:hover .cdel{display:flex}
 .cdel:hover{background:rgba(255,62,108,.25)}
-.empty{text-align:center;padding:4rem 2rem;color:var(--mu);font-size:.82rem;grid-column:1/-1}
+.empty{text-align:center;padding:4rem 2rem;color:var(--mu);font-size:.82rem;column-span:all}
 .empty strong{display:block;font-size:1.05rem;color:var(--mu2);margin-bottom:.4rem}
 
 /* MODAL */
@@ -112,6 +158,7 @@ header{padding:2rem 0 1.4rem;border-bottom:1px solid var(--bd);display:flex;alig
 .mbul li{font-size:.78rem;color:var(--mu2);padding:.22rem 0 .22rem .9rem;border-bottom:1px solid var(--bd);position:relative;line-height:1.4}
 .mbul li::before{content:'›';position:absolute;left:0;color:var(--g)}
 .mlnks{display:flex;flex-wrap:wrap;gap:.45rem}
+
 /* DUP DIALOG */
 #dupov{display:none;position:fixed;inset:0;background:rgba(7,7,13,.95);z-index:600;align-items:center;justify-content:center;padding:1.5rem;backdrop-filter:blur(8px)}
 #dupov.on{display:flex}
@@ -163,18 +210,33 @@ header{padding:2rem 0 1.4rem;border-bottom:1px solid var(--bd);display:flex;alig
     </div>
   </header>
 
+  <div class="searchwrap">
+    <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><circle cx="7" cy="7" r="5.5" stroke="currentColor" stroke-width="1.5"/><path d="M11 11l3.5 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+    <input type="text" id="searchInput" placeholder="Search posts, sources, content…" autocomplete="off">
+  </div>
+
   <div class="upzone" id="upzone">
     <input type="file" id="filein" accept="image/*" multiple>
     <div class="upicon">📸</div>
     <div class="uptxt">
       <strong>Drop LinkedIn screenshots here — or click to browse</strong>
-      <span>PNG · JPG · Multiple files OK · Local AI extracts and structures each one</span>
+      <span>PNG · JPG · WebP · Multiple files · Batch upload with progress</span>
     </div>
   </div>
 
-  <div id="abar">
-    <div class="pdot"></div>
-    <span id="atxt">Analyzing…</span>
+  <!-- BATCH UPLOAD PANEL -->
+  <div id="batchPanel">
+    <div class="batch-header">
+      <div class="batch-header-left">
+        <h3>Uploading</h3>
+        <span class="batch-counter" id="batchCounter">0 / 0</span>
+      </div>
+      <button class="batch-close" id="batchClose">✕ close</button>
+    </div>
+    <div class="batch-overall">
+      <div class="batch-bar-track"><div class="batch-bar-fill" id="batchBar"></div></div>
+    </div>
+    <div class="batch-files" id="batchFiles"></div>
   </div>
 
   <div class="chart">
@@ -183,19 +245,19 @@ header{padding:2rem 0 1.4rem;border-bottom:1px solid var(--bd);display:flex;alig
   </div>
 
   <div class="ctrls">
-    <button class="fbtn on" data-cat="all">All</button>
-    <button class="fbtn" data-cat="3dgs">3D / GS</button>
-    <button class="fbtn" data-cat="vp">Virtual Prod</button>
-    <button class="fbtn" data-cat="ai">AI Workflow</button>
-    <button class="fbtn" data-cat="tools">Tools</button>
-    <button class="fbtn" data-cat="contact">Contacts</button>
+    <button class="fbtn on" data-cat="all">All <span class="cnt" id="cntAll">0</span></button>
+    <button class="fbtn" data-cat="3dgs">3D / GS <span class="cnt" id="cnt3dgs">0</span></button>
+    <button class="fbtn" data-cat="vp">Virtual Prod <span class="cnt" id="cntVp">0</span></button>
+    <button class="fbtn" data-cat="ai">AI Workflow <span class="cnt" id="cntAi">0</span></button>
+    <button class="fbtn" data-cat="tools">Tools <span class="cnt" id="cntTools">0</span></button>
+    <button class="fbtn" data-cat="contact">Contacts <span class="cnt" id="cntContact">0</span></button>
     <div class="vtog">
       <button class="vbtn on" id="vgrid">⊞</button>
       <button class="vbtn" id="vlist">☰</button>
     </div>
   </div>
 
-  <div id="grid"></div>
+  <div id="grid" class="masonry"></div>
 </div>
 
 <!-- Card Modal -->
@@ -334,7 +396,6 @@ const SEED = [
       {l:'Changelog',u:'https://github.com/colmap/colmap/releases',t:''},
       {l:'COLMAP GitHub',u:'https://github.com/colmap/colmap',t:''}
     ] },
-
   { id:'s12', cat:'tools', ts:'2026-03-16T04:33', source:'Microsoft Copilot Studio · Agent Dev Workflow',
     summary:'Tools-to-Build-Tools approach: use Copilot inside VS Code to draft agent logic and instructions in code — 10x faster than web forms. Deploy Enterprise Agent Squads at scale.',
     bullets:['Build agent logic in VS Code with GitHub Copilot','Clone → Edit → Upload via Copilot Studio Extensions instantly','Workflow: VS Code → Test locally → Deploy to Copilot Studio → Finalise UI','Secret: use agents to build agents (PowerCAT method)'],
@@ -343,21 +404,18 @@ const SEED = [
       {l:'PowerCAT',u:'https://github.com/microsoft/powercat-creator-kit',t:''},
       {l:'VS Code',u:'https://code.visualstudio.com',t:''}
     ] },
-
   { id:'s13', cat:'ai', ts:'2026-03-05T18:51', source:'Korea JoongAng Daily · AI Film',
     summary:'Korea set to release its first completely AI-generated full-length film "I\'m PoPo" in May 2026 — 100% AI video production, a landmark moment for AI cinema globally.',
     bullets:['First 100% AI-generated feature film from South Korea','Title: "I\'m PoPo" (아이엠포포)','Release: May 2026','Signals commercial viability of fully AI-generated long-form content'],
     links:[
       {l:'Korea JoongAng Daily',u:'https://koreajoongangdaily.joins.com',t:'pr'}
     ] },
-
   { id:'s14', cat:'ai', ts:'2026-03-09T11:01', source:'Jason Zada · Founder & Director',
     summary:'"The Heist 3" — over 6 minutes, set in 1980s Miami\'s Little Havana, built with an entirely new AI process. Shot-by-shot iteration, not a one-click generation.',
     bullets:['6+ minute AI film — most ambitious yet','1980s Miami Little Havana setting','Compared to The Heist (Dec 2024, Veo2) — quality leap is massive','Demonstrates what AI storytelling looks like with serious craft and iteration'],
     links:[
       {l:'Jason Zada LinkedIn',u:'https://www.linkedin.com/in/jasonzada',t:'pr'}
     ] },
-
   { id:'s15', cat:'ai', ts:'2026-03-16T10:47', source:'Thiago Carneiro · VES Member / Unreal',
     summary:'Anthropic just released 13+ free self-paced AI courses via Anthropic Academy — covering Claude Code, API usage, and AI fundamentals. No cost, no certificate program needed.',
     bullets:['13+ free self-paced AI courses from Anthropic','Includes Claude Code course','Available at anthropic.skilljar.com','VES member highlighting it for film/VFX community'],
@@ -365,14 +423,12 @@ const SEED = [
       {l:'Anthropic Academy courses',u:'https://anthropic.skilljar.com',t:'pr'},
       {l:'Anthropic learning resources',u:'https://www.anthropic.com/learn',t:''}
     ] },
-
   { id:'s16', cat:'vp', ts:'2026-03-16T10:48', source:'Fragments Studio · AI Video Generation',
     summary:'Fragments Studio generates AI video from scene data — not text prompts. Motion and camera are the source of truth. Animators define the performance; AI resolves the final image from authored motion.',
     bullets:['Scene data + camera animation drives generation (not prompts)','Character animation imported via FBX — AI follows exactly','Exact camera control, predictable repeatable results','Animators becoming the primary creative force again','Video → frames → PLY pipeline planned for open source'],
     links:[
       {l:'Fragments Studio',u:'https://www.fragments.studio',t:'pr'}
     ] },
-
   { id:'s17', cat:'ai', ts:'2026-03-03T07:57', source:'Decart · Lucy 2.0 API',
     summary:'Decart\'s Lucy 2.0 is now available via API — their most powerful realtime model yet. Powers virtual try-ons, streaming apps, home design, live product placement, all in true realtime.',
     bullets:['Realtime AI image/video model via API','Use cases: virtual try-ons, streaming, live product placement','Open source Virtual Try-ons project available','Enterprise & collaboration contact: contact@decart.ai'],
@@ -381,14 +437,12 @@ const SEED = [
       {l:'Virtual Try-ons OSS',u:'https://github.com/deepinsight/insightface',t:''},
       {l:'contact@decart.ai',u:'mailto:contact@decart.ai',t:'co'}
     ] },
-
   { id:'s18', cat:'ai', ts:'2026-03-16T10:27', source:'AI Evolution · Perfect Claude Prompt',
     summary:'"Anatomy of a Perfect Claude Prompt" by Hamza Khalid — structured framework with 6 sections: Task+Identity, Context Files, Reference, Success Brief, Pre-Flight Check, Execution Plan.',
     bullets:['Task + Identity: I want to [TASK] so that [SUCCESS CRITERIA]','Success Brief section alone makes outputs 10x better — never skip it','Pre-Flight: List 3 rules, identify unclear items, name biggest risk','Execution Plan: Only begin work once I say "Go"','Works with Claude Opus 4.6 and Sonnet 4.5 with Projects + context files'],
     links:[
       {l:'how-to-ai.guide',u:'https://how-to-ai.guide',t:'pr'}
     ] },
-
   { id:'s19', cat:'3dgs', ts:'2026-03-11T10:31', source:'Nicholas Markowitz · Chief Experience Officer',
     summary:'Gaussian Splats now being discussed and integrated into ArcGIS workflows at #EsriEPC26. GIS + 3DGS convergence — game-changing for how people capture and use 3D data at scale.',
     bullets:['Gaussian Splats integrated into ArcGIS at Esri Partner Conference 2026','Esri product leads + Andrew Milanes + Es2 presenting','Reality Mapping for GIS: Drone, Aerial, Satellite → Gaussian Splats','Outputs: 3D Meshes, True Orthos, Point Clouds, Gaussian Splats','Massively scalable local-to-national coverage'],
@@ -396,7 +450,6 @@ const SEED = [
       {l:'Esri ArcGIS',u:'https://www.esri.com/en-us/arcgis/about-arcgis/overview',t:'pr'},
       {l:'Es2 website',u:'https://www.es2.co',t:''}
     ] },
-
   { id:'s20', cat:'tools', ts:'2026-03-16T10:43', source:'ComfyUI Official · App Mode',
     summary:'ComfyUI App Mode is now live — pick a workflow, switch to App Mode, run it without touching nodes. Removes all friction for non-technical users running and sharing workflows.',
     bullets:['App Mode: no node editing needed to run workflows','Pick workflow → switch to App Mode — that simple','Theoretically Media walkthrough guide available','Whether new or seasoned user, App Mode removes startup friction'],
@@ -404,14 +457,12 @@ const SEED = [
       {l:'ComfyUI App Mode',u:'https://www.comfy.org',t:'pr'},
       {l:'Theoretically Media walkthrough',u:'https://www.youtube.com/@TheoreticallyMedia',t:''}
     ] },
-
   { id:'s21', cat:'vp', ts:'2026-03-02T09:37', source:'Tahir Palali · Fragments Studio',
     summary:'Proxy models for AI renders are a gamechanger for previz, animatics, look dev, art direction and Virtual Production. High-res proxy models give higher precision, production-ready, repeatable workflows.',
     bullets:['Proxy model → AI render workflow for VP and previz','High-res models = higher precision + repeatable results','Fragments Studio nearing full launch (scaling infra slowly)','Early access available — contact Tahir directly'],
     links:[
       {l:'Fragments Studio',u:'https://www.fragments.studio',t:'pr'}
     ] },
-
   { id:'s22', cat:'ai', ts:'2026-03-16T10:25', source:'Investor AI · Claude Memory Import',
     summary:'Claude now supports importing your entire memory from ChatGPT, Gemini, or any AI in 60 seconds. Two steps: copy prompt into old AI → paste output into Claude\'s memory settings.',
     bullets:['Import memory from any AI at claude.com/import-memory','Step 1: Paste prompt into ChatGPT → get full memory export','Step 2: Paste into Claude Settings → Memory → Save','First conversation already feels personalized — no repeating yourself','Works with Cowork for max power'],
@@ -419,7 +470,6 @@ const SEED = [
       {l:'claude.com/import-memory',u:'https://claude.com/import-memory',t:'pr'},
       {l:'Claude settings',u:'https://claude.ai/settings',t:''}
     ] },
-
   { id:'s23', cat:'3dgs', ts:'2026-03-09T07:23', source:'Dazai Chen · Creative Technologist',
     summary:'Custom Compute Shader plugin for Unreal Engine 5 plays 4DGS PLY sequences at 60 FPS, rendering 1.18M gaussians per frame in real-time. PLY sequences generated from video via Apple ML-Sharp.',
     bullets:['60 FPS real-time 4DGS in Unreal Engine 5 via custom Compute Shader plugin','Renders 1.18M gaussians per frame','PLY sequences generated from video using Apple ML-Sharp','Automated pipeline: video → frames → PLY sequences (planning to open source)','Previously rendered offline in SuperSplat — now fully real-time'],
@@ -428,7 +478,6 @@ const SEED = [
       {l:'SuperSplat viewer',u:'https://playcanvas.com/supersplat/editor',t:''},
       {l:'Connect with Dazai Chen',u:'https://www.linkedin.com/in/dazaichen',t:''}
     ] },
-
   { id:'s24', cat:'3dgs', ts:'2026-03-09T07:44', source:'XR AI Spotlight · Wist Labs Shutdown',
     summary:'Wist Labs — the app that converts videos into 3D spatial memories for Quest and Vision Pro — is shutting down. A reflection on 5 years of building spatial memory tech and what Apple\'s SHARP open-sourcing means for the future.',
     bullets:['Wist Labs shutting down after 5 years — turns video into 3D spatial memories','Worked on Meta Quest 3 and Apple Vision Pro','Apple open-sourcing SHARP makes this technology inevitable regardless','Founder quote: "spent way too many late nights and weekends away from my family"','Signals how hard consumer XR spatial products are to sustain commercially'],
@@ -437,7 +486,6 @@ const SEED = [
       {l:'Apple ML-Sharp',u:'https://github.com/apple/ml-sharp',t:''},
       {l:'XR AI Spotlight',u:'https://www.linkedin.com/newsletters/xr-ai-spotlight',t:''}
     ] },
-
   { id:'s25', cat:'tools', ts:'2026-03-16T11:48', source:'ComfyUI · Upscaling Model Guide',
     summary:'Choosing the wrong upscaling model wastes hours re-rendering. ComfyUI benchmarked 20+ workflows across 10 use cases — portraits, product shots, AI video fixes, archival restoration, CGI renders.',
     bullets:['Wrong creative model = hallucinated label details on product shots','Conservative model = technically accurate but plastic-looking skin','20+ workflows benchmarked across 10 use cases','Every model rated for speed, quality, and when it actually works'],
@@ -451,6 +499,8 @@ let posts = SEED.map(p => ({...p}));
 let activeFilter = 'all';
 let activeView = 'grid';
 let dupResolve = null;
+let searchQuery = '';
+let collapsedMonths = new Set();
 
 // ── CAT META ───────────────────────────────────────────────────────
 const CAT = {
@@ -473,10 +523,32 @@ function fmt(ts) {
   } catch(e){ return ts; }
 }
 
+function monthKey(ts) {
+  try {
+    const d = new Date(ts);
+    return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0');
+  } catch(e) { return '0000-00'; }
+}
+
+function monthLabel(key) {
+  const [y,m] = key.split('-');
+  const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  return months[parseInt(m)-1] + ' ' + y;
+}
+
+// ── SEARCH ─────────────────────────────────────────────────────────
+function matchesSearch(p, q) {
+  if (!q) return true;
+  const ql = q.toLowerCase();
+  const hay = ((p.source||'') + ' ' + (p.summary||'') + ' ' + (p.bullets||[]).join(' ') + ' ' + (p.links||[]).map(l=>l.l+' '+l.u).join(' ')).toLowerCase();
+  return ql.split(/\s+/).every(word => hay.includes(word));
+}
+
 // ── RENDER ─────────────────────────────────────────────────────────
 function render() {
   renderChart();
   renderStats();
+  renderCounts();
   renderCards();
 }
 
@@ -484,6 +556,17 @@ function renderStats() {
   document.getElementById('statPosts').textContent = posts.length;
   let lc = 0; posts.forEach(p => lc += (p.links||[]).length);
   document.getElementById('statLinks').textContent = lc;
+}
+
+function renderCounts() {
+  const filtered = activeFilter === 'all' ? posts : posts.filter(p => p.cat === activeFilter);
+  const searched = filtered.filter(p => matchesSearch(p, searchQuery));
+  document.getElementById('cntAll').textContent = searched.length;
+  document.getElementById('cnt3dgs').textContent = searched.filter(p=>p.cat==='3dgs').length;
+  document.getElementById('cntVp').textContent = searched.filter(p=>p.cat==='vp').length;
+  document.getElementById('cntAi').textContent = searched.filter(p=>p.cat==='ai').length;
+  document.getElementById('cntTools').textContent = searched.filter(p=>p.cat==='tools').length;
+  document.getElementById('cntContact').textContent = searched.filter(p=>p.cat==='contact').length;
 }
 
 function renderChart() {
@@ -502,33 +585,78 @@ function renderChart() {
 function renderCards() {
   const g = document.getElementById('grid');
   let list = activeFilter==='all' ? posts : posts.filter(p=>p.cat===activeFilter);
+  list = list.filter(p => matchesSearch(p, searchQuery));
   list = [...list].sort((a,b)=>new Date(b.ts)-new Date(a.ts));
+
   if(!list.length){
-    g.innerHTML='<div class="empty"><strong>No posts yet</strong>Drop some LinkedIn screenshots above</div>';
+    g.innerHTML='<div class="empty"><strong>No posts found</strong>' + (searchQuery ? 'Try a different search' : 'Drop some LinkedIn screenshots above') + '</div>';
+    g.className = activeView==='list' ? 'masonry lv' : 'masonry';
     return;
   }
-  g.innerHTML = list.map(p => {
-    const thumb = p.img ? `<img class="cthumb" src="${p.img}" alt="">` : '';
-    const lnks  = (p.links||[]).map(l=>`<a class="lnk ${l.t||''}" href="${l.u}" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation()"><svg width="9" height="9" viewBox="0 0 10 10" fill="none" style="flex-shrink:0"><path d="M1 9L9 1M9 1H4M9 1V6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg> ${l.l}</a>`).join('');
-    const buls  = (p.bullets||[]).slice(0,3).map(b=>`<li>${b}</li>`).join('');
-    return `<div class="card ${catCls(p.cat)}" onclick="openCard('${p.id}')">
-      <button class="cdel" onclick="event.stopPropagation();delCard('${p.id}')">✕</button>
-      ${thumb}
-      <div class="cin">
-        <div class="ctop">
-          <div><div class="csrc">${p.source}</div><div class="ctime">${fmt(p.ts)}</div></div>
-          <span class="ctag ${catCls(p.cat)}">${catLbl(p.cat)}</span>
-        </div>
-        <p class="csum">${p.summary}</p>
-        ${buls?`<ul class="cbul">${buls}</ul>`:''}
-        ${lnks?`<div class="clnks">${lnks}</div>`:''}
+
+  // Group by month
+  const groups = {};
+  list.forEach(p => {
+    const mk = monthKey(p.ts);
+    if (!groups[mk]) groups[mk] = [];
+    groups[mk].push(p);
+  });
+
+  // Sort groups newest first
+  const sortedKeys = Object.keys(groups).sort().reverse();
+
+  let html = '';
+  for (const mk of sortedKeys) {
+    const collapsed = collapsedMonths.has(mk);
+    const cards = groups[mk].map(p => renderCardHTML(p)).join('');
+    html += `<div class="dategroup">
+      <div class="datehdr" onclick="toggleMonth('${mk}')">
+        <span class="datearrow ${collapsed?'collapsed':''}" id="arrow-${mk}">▾</span>
+        <span class="datelbl">${monthLabel(mk)}</span>
+        <span class="datecnt">${groups[mk].length}</span>
+        <div class="datehdr-line"></div>
+      </div>
+      <div class="datecards ${collapsed?'collapsed':''}" id="cards-${mk}" style="max-height:${collapsed?'0':(groups[mk].length*400)+'px'}">
+        ${cards}
       </div>
     </div>`;
-  }).join('');
-  g.className = activeView==='list' ? 'lv' : '';
-  // re-set id after className wipe
-  g.id = 'grid';
+  }
+
+  g.innerHTML = html;
+  // Apply list/grid class to each datecards container, preserving collapsed state
+  document.querySelectorAll('.datecards').forEach(dc => {
+    const mk = dc.id.replace('cards-','');
+    const isCollapsed = collapsedMonths.has(mk);
+    const baseClass = activeView==='list' ? 'datecards lv' : 'datecards';
+    dc.className = isCollapsed ? baseClass + ' collapsed' : baseClass;
+  });
 }
+
+function renderCardHTML(p) {
+  const thumb = p.img ? `<div class="cthumb-wrap"><img class="cthumb" src="${p.img}" alt=""></div>` : '';
+  const lnks  = (p.links||[]).map(l=>`<a class="lnk ${l.t||''}" href="${l.u}" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation()"><svg width="9" height="9" viewBox="0 0 10 10" fill="none" style="flex-shrink:0"><path d="M1 9L9 1M9 1H4M9 1V6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg> ${l.l}</a>`).join('');
+  const buls  = (p.bullets||[]).slice(0,3).map(b=>`<li>${b}</li>`).join('');
+  return `<div class="card ${catCls(p.cat)}" onclick="openCard('${p.id}')">
+    <button class="cdel" onclick="event.stopPropagation();delCard('${p.id}')">✕</button>
+    ${thumb}
+    <div class="cin">
+      <div class="ctop">
+        <div><div class="csrc">${p.source}</div><div class="ctime">${fmt(p.ts)}</div></div>
+        <span class="ctag ${catCls(p.cat)}">${catLbl(p.cat)}</span>
+      </div>
+      <p class="csum">${p.summary}</p>
+      ${buls?`<ul class="cbul">${buls}</ul>`:''}
+      ${lnks?`<div class="clnks">${lnks}</div>`:''}
+    </div>
+  </div>`;
+}
+
+// ── DATE GROUP TOGGLE ──────────────────────────────────────────────
+window.toggleMonth = function(mk) {
+  if (collapsedMonths.has(mk)) collapsedMonths.delete(mk);
+  else collapsedMonths.add(mk);
+  renderCards();
+};
 
 // ── MODAL ──────────────────────────────────────────────────────────
 function openCard(id) {
@@ -630,7 +758,9 @@ function showDupDialog(incoming, existing, info) {
 }
 function closeDup(){ document.getElementById('dupov').classList.remove('on'); }
 
-// ── SERVER-SIDE UPLOAD (Local OCR + MiMo) ────────────────────────
+// ── BATCH UPLOAD ───────────────────────────────────────────────────
+const BATCH_CONCURRENCY = 3;
+
 async function uploadToServer(file) {
   const formData = new FormData();
   formData.append('file', file);
@@ -641,22 +771,98 @@ async function uploadToServer(file) {
   return data;
 }
 
-// ── HANDLE FILES ───────────────────────────────────────────────────
-async function handleFiles(files) {
-  const bar = document.getElementById('abar');
-  const txt = document.getElementById('atxt');
-  bar.classList.add('on');
+function createBatchFileEntry(file, index) {
+  return new Promise(res => {
+    const reader = new FileReader();
+    reader.onload = () => res(reader.result);
+    reader.onerror = () => res('');
+    reader.readAsDataURL(file);
+  });
+}
 
-  for(let i=0;i<files.length;i++){
-    const file = files[i];
-    txt.textContent = `Processing ${i+1}/${files.length}: ${file.name} (OCR + MiMo)…`;
-    try {
-      const newPost = await uploadToServer(file);
-      posts.unshift(newPost);
-      render();
-    } catch(err){ console.error(file.name, err); }
+async function handleFiles(files) {
+  const panel = document.getElementById('batchPanel');
+  const counter = document.getElementById('batchCounter');
+  const bar = document.getElementById('batchBar');
+  const filesDiv = document.getElementById('batchFiles');
+
+  panel.classList.add('on');
+  filesDiv.innerHTML = '';
+  counter.textContent = `0 / ${files.length}`;
+  counter.className = 'batch-counter';
+  bar.style.width = '0%';
+
+  // Create entries with thumbnails
+  const entries = [];
+  for (let i = 0; i < files.length; i++) {
+    const thumb = await createBatchFileEntry(files[i]);
+    const entry = document.createElement('div');
+    entry.className = 'batch-file';
+    entry.innerHTML = `
+      <img class="batch-file-thumb" src="${thumb}" alt="">
+      <div class="batch-file-info">
+        <div class="batch-file-name">${files[i].name}</div>
+        <div class="batch-file-status pending" id="bstatus-${i}">Queued</div>
+      </div>
+      <div class="batch-file-icon" id="bicon-${i}"></div>
+    `;
+    filesDiv.appendChild(entry);
+    entries.push({ file: files[i], thumb });
   }
-  bar.classList.remove('on');
+
+  // Process with concurrency limit
+  let completed = 0;
+  let errors = 0;
+  const total = files.length;
+
+  async function processFile(idx) {
+    const statusEl = document.getElementById(`bstatus-${idx}`);
+    const iconEl = document.getElementById(`bicon-${idx}`);
+
+    statusEl.textContent = 'Processing…';
+    statusEl.className = 'batch-file-status processing';
+    iconEl.innerHTML = '<span class="spinner"></span>';
+
+    try {
+      const newPost = await uploadToServer(entries[idx].file);
+      posts.unshift(newPost);
+      statusEl.textContent = 'Done';
+      statusEl.className = 'batch-file-status done';
+      iconEl.textContent = '✓';
+      completed++;
+    } catch(err) {
+      console.error(entries[idx].file.name, err);
+      statusEl.textContent = 'Error: ' + (err.message||'Failed');
+      statusEl.className = 'batch-file-status error';
+      iconEl.textContent = '✕';
+      completed++;
+      errors++;
+    }
+
+    counter.textContent = `${completed} / ${total}`;
+    if (errors > 0) counter.className = 'batch-counter error';
+    bar.style.width = `${Math.round(completed/total*100)}%`;
+  }
+
+  // Run with concurrency limit
+  const queue = [...Array(total).keys()];
+  const workers = [];
+  for (let w = 0; w < Math.min(BATCH_CONCURRENCY, total); w++) {
+    workers.push((async () => {
+      while (queue.length) {
+        const idx = queue.shift();
+        if (idx !== undefined) await processFile(idx);
+      }
+    })());
+  }
+  await Promise.all(workers);
+
+  render();
+
+  // Auto-fade after 2 seconds if all succeeded
+  if (errors === 0) {
+    setTimeout(() => { panel.classList.remove('on'); }, 2000);
+  }
 }
 
 // ── WIRE UP ────────────────────────────────────────────────────────
@@ -674,6 +880,22 @@ async function handleFiles(files) {
     if(fs.length) handleFiles(fs);
   });
 
+  // Batch close
+  document.getElementById('batchClose').addEventListener('click', ()=>{
+    document.getElementById('batchPanel').classList.remove('on');
+  });
+
+  // Search
+  let searchTimer;
+  document.getElementById('searchInput').addEventListener('input', e=>{
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(()=>{
+      searchQuery = e.target.value.trim();
+      renderCards();
+      renderCounts();
+    }, 200);
+  });
+
   // Filter buttons
   document.querySelectorAll('.fbtn').forEach(btn=>{
     btn.addEventListener('click', ()=>{
@@ -681,6 +903,7 @@ async function handleFiles(files) {
       btn.classList.add('on');
       activeFilter=btn.dataset.cat;
       renderCards();
+      renderCounts();
     });
   });
 

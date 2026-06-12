@@ -10,23 +10,18 @@ AI-powered tool for curating LinkedIn screenshots into filterable knowledge card
 - Keep all image processing local (no images sent to cloud)
 
 ## In Progress
-
 - [ ] Verify end-to-end upload flow with local OCR + MiMo
 - [ ] Test with actual LinkedIn screenshots
 - [ ] Optimize Ollama model loading (keep vision model warm)
 
 ## To Do
-
-- [ ] Add search/filter by text content
 - [ ] Export posts as JSON/CSV
-- [ ] Add batch upload with progress indicator
 - [ ] Duplicate detection via image similarity
 - [ ] Add authentication for upload endpoint
-- [ ] Mobile-responsive layout improvements
 - [ ] Add API rate limiting
 
 ## Done
-
+## Done
 - [x] SQLite database with full CRUD
 - [x] PHP backend with upload, read, update, delete endpoints
 - [x] Frontend SPA with card grid, modal, filters, category chart
@@ -37,12 +32,27 @@ AI-powered tool for curating LinkedIn screenshots into filterable knowledge card
 - [x] Removed all external API dependencies
 - [x] Fixed Authorization header bug in upload.php
 - [x] GitHub repo created and pushed
+- [x] Batch upload with per-file progress panel (3 concurrent uploads)
+- [x] Real-time search/filter by text content (debounced 200ms)
+- [x] Date grouping (posts grouped by month, collapsible)
+- [x] Category count badges on filter buttons
+- [x] Masonry 3-column layout (responsive: 2-col < 1100px, 1-col < 700px)
+- [x] Improved card thumbnails with gradient overlay
 
 ## Blocked
 
 -
 
 ## Releases
+
+### v1.1 — Batch Upload + Better Organization
+- Batch upload panel with per-file progress, thumbnails, status indicators
+- 3 concurrent uploads for speed
+- Real-time search/filter (debounced 200ms)
+- Date grouping by month with collapsible sections
+- Category count badges on filter buttons
+- Masonry 3-column layout (responsive breakpoints)
+- Improved card thumbnails with gradient overlay
 
 ### v1.0 — Pure Local Pipeline
 - Replaced all external APIs with local Ollama moondream for OCR
