@@ -27,8 +27,8 @@ AI-powered tool for curating LinkedIn screenshots into filterable knowledge card
 - [x] Frontend SPA with card grid, modal, filters, category chart
 - [x] Dark theme with animated ambient effects
 - [x] Duplicate detection dialog (client-side)
-- [x] Local OCR via Ollama (moondream)
-- [x] Card structuring via PHP regex parser (no LLM needed)
+- [x] Local OCR via Ollama (gemma4:e2b primary, minicpm-v, moondream fallback)
+- [x] Card structuring via PHP parser with proper text extraction
 - [x] Removed all external API dependencies
 - [x] Fixed Authorization header bug in upload.php
 - [x] GitHub repo created and pushed
