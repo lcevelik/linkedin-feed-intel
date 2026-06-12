@@ -1,6 +1,6 @@
 # LinkedIn Feed Intel
 
-AI-powered tool for curating LinkedIn screenshots into filterable knowledge cards. Local OCR extracts text from screenshots, MiMo structures them into categorized cards.
+AI-powered tool for curating LinkedIn screenshots into filterable knowledge cards. Local OCR (moondream) extracts text, PHP parser structures into categorized cards.
 
 ## Goals
 
@@ -32,9 +32,9 @@ AI-powered tool for curating LinkedIn screenshots into filterable knowledge card
 - [x] Frontend SPA with card grid, modal, filters, category chart
 - [x] Dark theme with animated ambient effects
 - [x] Duplicate detection dialog (client-side)
-- [x] Local OCR via Ollama (qwen2.5vl:3b)
-- [x] Card structuring via MiMo v2.5 (OpenRouter)
-- [x] Removed direct Anthropic API calls from frontend
+- [x] Local OCR via Ollama (moondream)
+- [x] Card structuring via PHP regex parser (no LLM needed)
+- [x] Removed all external API dependencies
 - [x] Fixed Authorization header bug in upload.php
 - [x] GitHub repo created and pushed
 
@@ -44,10 +44,10 @@ AI-powered tool for curating LinkedIn screenshots into filterable knowledge card
 
 ## Releases
 
-### v1.0 — Local OCR + MiMo Pipeline
-- Replaced Claude-only API with hybrid: local Ollama vision + MiMo structuring
-- Frontend no longer calls external APIs directly
-- All processing happens server-side
+### v1.0 — Pure Local Pipeline
+- Replaced all external APIs with local Ollama moondream for OCR
+- PHP regex parser for card structuring (no LLM needed for step 2)
+- Zero API keys required — fully self-contained
 
 ### v0.1 — Initial Release
 - Upload screenshots, manual card creation
