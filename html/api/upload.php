@@ -56,17 +56,23 @@ try {
     $bullets = [];
     $links = [];
 
-    // STEP 1: Local OCR via Ollama vision model (moondream)
-    $ocrText = ocrWithOllama($imageData);
+    // Phase 1: Extract raw text from image (OCR)
+    $rawText = extractTextFromImage($imageData);
 
-    if ($ocrText) {
-        // STEP 2: Parse OCR description into structured card
-        $parsed = parseOcrToCard($ocrText);
-        $source = $parsed['source'];
-        $cat = $parsed['cat'];
-        $summary = $parsed['summary'];
-        $bullets = $parsed['bullets'];
-        $links = $parsed['links'];
+    if ($rawText) {
+        // Phase 2: Structure raw text into card fields using LLM
+        $card = structureWithLLM($rawText);
+
+        if (!$card) {
+            // Fallback: regex parsing if LLM structuring fails
+            $card = buildCardFromRawText($rawText);
+        }
+
+        $source  = $card['source']  ?? 'User Upload';
+        $cat     = $card['cat']     ?? 'ai';
+        $summary = $card['summary'] ?? '';
+        $bullets = $card['bullets'] ?? [];
+        $links   = $card['links']   ?? [];
     }
 
     $pdo = getDB();
@@ -91,240 +97,296 @@ try {
 
 
 // ══════════════════════════════════════════════════════════════════════
-// STEP 1: Local OCR via Ollama Vision Model (moondream)
+// PHASE 1: Extract raw text from image using vision model
 // ══════════════════════════════════════════════════════════════════════
 
-function ocrWithOllama($imageData) {
+function extractTextFromImage($imageData) {
     $b64 = base64_encode($imageData);
 
+    // Focused OCR prompt — asks for verbatim text, not a description
+    $prompt = 'Read and list ALL text visible in this image exactly as written. '
+            . 'Include: the person\'s name, job title, company, the full post text word for word, '
+            . 'any URLs (https://...), hashtags (#tag), email addresses, and bullet points. '
+            . 'Output only the raw text you can read. Do not describe the image.';
+
+    // Try vision models in order of OCR quality
+    // gemma4:e2b — modern multimodal with native vision encoder, good at reading text
+    // minicpm-v  — document/OCR-specialist with CLIP encoder
+    // moondream  — small fallback; works but prone to hallucination
+    $visionModels = ['gemma4:e2b', 'minicpm-v', 'moondream'];
+
+    foreach ($visionModels as $model) {
+        $text = callVisionModel($model, $b64, $prompt);
+        if (!$text) continue;
+
+        // Accept result if it looks like actual OCR text, not an image description
+        if (!looksLikeDescription($text) && strlen($text) > 20) {
+            error_log("OCR OK [$model]: " . substr($text, 0, 300));
+            return $text;
+        }
+
+        // moondream returned a description — keep as last-resort fallback
+        error_log("OCR description from [$model]: " . substr($text, 0, 200));
+        $descriptionFallback = $text;
+    }
+
+    return $descriptionFallback ?? null;
+}
+
+function callVisionModel($model, $b64, $prompt) {
     $payload = [
-        'model' => VISION_MODEL,
-        'prompt' => 'Describe everything you see in this image in detail. Who posted it, what did they write, and what is the post about?',
-        'images' => [$b64],
-        'stream' => false,
-        'options' => [
-            'temperature' => 0.1,
-            'num_predict' => 1024
-        ]
+        'model'   => $model,
+        'prompt'  => $prompt,
+        'images'  => [$b64],
+        'stream'  => false,
+        'options' => ['temperature' => 0.0, 'num_predict' => 700]
     ];
 
     $ch = curl_init(OLLAMA_URL . '/api/generate');
     curl_setopt_array($ch, [
         CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
-        CURLOPT_POST => true,
-        CURLOPT_POSTFIELDS => json_encode($payload),
-        CURLOPT_TIMEOUT => 60
+        CURLOPT_HTTPHEADER     => ['Content-Type: application/json'],
+        CURLOPT_POST           => true,
+        CURLOPT_POSTFIELDS     => json_encode($payload),
+        CURLOPT_TIMEOUT        => 120,
     ]);
 
     $response = curl_exec($ch);
-    $curlError = curl_error($ch);
     $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $curlErr  = curl_error($ch);
     curl_close($ch);
 
-    if ($curlError) {
-        error_log("Ollama OCR curl error: $curlError");
+    if ($curlErr) {
+        error_log("OCR [$model] curl error: $curlErr");
         return null;
     }
-
     if ($httpCode !== 200) {
-        error_log("Ollama OCR error: HTTP $httpCode - $response");
+        error_log("OCR [$model] HTTP $httpCode: " . substr($response, 0, 300));
         return null;
     }
 
     $decoded = json_decode($response, true);
-    if (!$decoded || !isset($decoded['response'])) {
-        error_log("Ollama OCR decode failed");
-        return null;
-    }
+    return isset($decoded['response']) ? trim($decoded['response']) : null;
+}
 
-    $text = trim($decoded['response']);
-    if (empty($text)) {
-        error_log("Ollama OCR returned empty text");
-        return null;
-    }
-
-    error_log("OCR raw: " . substr($text, 0, 300));
-    return $text;
+function looksLikeDescription($text) {
+    // True when the model returned a description of the image rather than OCR text.
+    // Common moondream patterns: "The image shows...", "This screenshot displays..."
+    return (bool) preg_match(
+        '/^(the image (shows?|displays?|contains?|depicts?)|this (image|screenshot|picture)|there (is|are) a)/i',
+        trim($text)
+    );
 }
 
 
 // ══════════════════════════════════════════════════════════════════════
-// STEP 2: Parse moondream description into structured card
+// PHASE 2: Structure raw OCR text into card fields using a text LLM
 // ══════════════════════════════════════════════════════════════════════
 
-function parseOcrToCard($text) {
-    // Extract quoted text (actual content from the image)
-    $quotedTexts = [];
-    if (preg_match_all('/"([^"]+)"/', $text, $m)) {
-        $quotedTexts = $m[1];
+function structureWithLLM($rawText) {
+    // /no_think disables qwen3 chain-of-thought output
+    $prompt = '/no_think
+Extract structured data from this LinkedIn post text and return ONLY valid JSON — no explanation, no markdown fences.
+
+Required JSON format:
+{"source":"Author Name · Job Title at Company","cat":"ai","summary":"1-2 sentence summary of what was shared","bullets":["key point 1","key point 2"],"links":[{"l":"display label","u":"https://url","t":""}]}
+
+Category values (pick one): 3dgs (gaussian splatting/NeRF/3D reconstruction), vp (virtual production/Unreal Engine/LED volume), tools (software/ComfyUI/GitHub/SDK/app), contact (DM/networking/met someone), ai (AI/ML/LLM/everything else)
+Link "t" field: "pr" = primary/main link, "co" = email/contact address, "" = secondary link
+
+LINKEDIN POST TEXT:
+' . substr($rawText, 0, 2000);
+
+    // qwen3:1.7b — fast text model, handles JSON well; qwen3.5:4b as backup
+    foreach (['qwen3:1.7b', 'qwen3.5:4b'] as $model) {
+        $result = callTextModel($model, $prompt);
+        if (!$result) continue;
+
+        $card = parseJsonFromLLM($result);
+        if ($card) {
+            error_log("Structure OK [$model]: source=" . ($card['source'] ?? '?'));
+            return normaliseCard($card);
+        }
+        error_log("Structure JSON parse failed [$model]: " . substr($result, 0, 300));
     }
-    if (preg_match_all('/\'([^\']+)\'/', $text, $m)) {
-        $quotedTexts = array_merge($quotedTexts, $m[1]);
+
+    return null;
+}
+
+function callTextModel($model, $prompt) {
+    $payload = [
+        'model'   => $model,
+        'prompt'  => $prompt,
+        'stream'  => false,
+        'options' => ['temperature' => 0.1, 'num_predict' => 500]
+    ];
+
+    $ch = curl_init(OLLAMA_URL . '/api/generate');
+    curl_setopt_array($ch, [
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_HTTPHEADER     => ['Content-Type: application/json'],
+        CURLOPT_POST           => true,
+        CURLOPT_POSTFIELDS     => json_encode($payload),
+        CURLOPT_TIMEOUT        => 90,
+    ]);
+
+    $response = curl_exec($ch);
+    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $curlErr  = curl_error($ch);
+    curl_close($ch);
+
+    if ($curlErr || $httpCode !== 200) {
+        error_log("Text model [$model] error: $curlErr / HTTP $httpCode");
+        return null;
     }
 
-    // Build the actual post content from quoted texts
-    $postContent = !empty($quotedTexts) ? implode(' ', $quotedTexts) : $text;
+    $decoded = json_decode($response, true);
+    return isset($decoded['response']) ? trim($decoded['response']) : null;
+}
 
-    // Extract source (author name)
-    $source = extractSource($text, $quotedTexts);
+function parseJsonFromLLM($text) {
+    // Strip qwen3 thinking tags
+    $text = preg_replace('/<think>.*?<\/think>/s', '', $text);
+    $text = trim($text);
 
-    // Extract category
-    $cat = detectCategory($postContent . ' ' . $text);
+    // Direct parse
+    $d = json_decode($text, true);
+    if (is_array($d) && isset($d['source'])) return $d;
 
-    // Build summary from the actual content
-    $summary = buildSummary($text, $quotedTexts);
+    // Strip markdown code fences
+    if (preg_match('/```(?:json)?\s*(\{.+?\})\s*```/s', $text, $m)) {
+        $d = json_decode($m[1], true);
+        if (is_array($d) && isset($d['source'])) return $d;
+    }
 
-    // Extract bullets (key points)
-    $bullets = extractBullets($text, $quotedTexts);
+    // Find first JSON object in output (handles leading explanation)
+    if (preg_match('/(\{(?:[^{}]|\{[^{}]*\})*\})/s', $text, $m)) {
+        $d = json_decode($m[1], true);
+        if (is_array($d) && isset($d['source'])) return $d;
+    }
 
-    // Extract links
-    $links = extractLinks($text);
+    return null;
+}
 
-    // Extract hashtags
-    $hashtags = extractHashtags($text);
+function normaliseCard($card) {
+    $links = [];
+    foreach (($card['links'] ?? []) as $l) {
+        if (!empty($l['u'])) {
+            $links[] = [
+                'l' => $l['l'] ?? parse_url($l['u'], PHP_URL_HOST) ?? $l['u'],
+                'u' => $l['u'],
+                't' => $l['t'] ?? '',
+            ];
+        }
+    }
 
     return [
-        'source' => $source,
-        'cat' => $cat,
-        'summary' => $summary,
-        'bullets' => $bullets,
-        'links' => $links
+        'source'  => trim($card['source']  ?? 'User Upload'),
+        'cat'     => validateCat($card['cat'] ?? 'ai'),
+        'summary' => trim($card['summary'] ?? ''),
+        'bullets' => array_values(array_filter(array_map('trim', $card['bullets'] ?? []))),
+        'links'   => $links,
     ];
 }
 
-function extractSource($text, $quotedTexts) {
-    // Pattern: "from/by/sent by Name" (most common in moondream output)
-    if (preg_match('/(?:from|by|written by|posted by|authored by|sent by)\s+([A-Z][a-z]+(?:\s+(?!to |at |and |the |his |her )[A-Z][a-z]+)*)/i', $text, $m)) {
+function validateCat($cat) {
+    return in_array($cat, ['3dgs', 'vp', 'tools', 'contact', 'ai']) ? $cat : 'ai';
+}
+
+
+// ══════════════════════════════════════════════════════════════════════
+// FALLBACK: Regex parsing when LLM structuring is unavailable
+// ══════════════════════════════════════════════════════════════════════
+
+function buildCardFromRawText($text) {
+    return [
+        'source'  => extractSourceFromText($text),
+        'cat'     => detectCategory($text),
+        'summary' => buildSummaryFromText($text),
+        'bullets' => extractBulletsFromText($text),
+        'links'   => extractLinksFromText($text),
+    ];
+}
+
+function extractSourceFromText($text) {
+    // "Name · Title" or "Name | Title"
+    if (preg_match('/([A-Z][a-z]+(?:\s+[A-Z][a-z]+)+)\s*[·|]\s*(.{5,60})/', $text, $m)) {
+        return trim($m[1]) . ' · ' . trim($m[2]);
+    }
+    // "by/from Name"
+    if (preg_match('/(?:by|from|posted by)\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)+)/i', $text, $m)) {
         return $m[1];
     }
-
-    // Pattern: "reads/says 'Name'"
-    if (preg_match('/(?:reads?|says?|titled|named)\s*[:\s]*["\']([A-Z][a-z]+(?:\s+[A-Z][a-z]+)+)/i', $text, $m)) {
-        return $m[1];
-    }
-
-    // Pattern: "Name followed by" or "Name announces"
-    if (preg_match('/([A-Z][a-z]+(?:\s+[A-Z][a-z]+)+)\s+(?:followed|announces|announced|shares|shared|posts|posted|writes|wrote|says|said|displaying)/i', $text, $m)) {
-        return $m[1];
-    }
-
-    // Pattern: "Name, Title" or "Name at Company"
-    if (preg_match('/([A-Z][a-z]+(?:\s+[A-Z][a-z]+)+)\s*[,\u00B7]\s*(?:VP|CEO|CTO|Director|Manager|Engineer|Lead|Head|Chief)/i', $text, $m)) {
-        return $m[1];
-    }
-
-    // Look in quoted texts for a name-like string
-    foreach ($quotedTexts as $qt) {
-        if (preg_match('/^([A-Z][a-z]+(?:\s+[A-Z][a-z]+)+)$/', trim($qt), $m)) {
-            return $m[1];
-        }
-    }
-
-    // First proper name in text
+    // First proper name-like string
     if (preg_match('/([A-Z][a-z]+ [A-Z][a-z]+)/', $text, $m)) {
         return $m[1];
     }
-
     return 'User Upload';
 }
 
-
 function detectCategory($text) {
     $t = strtolower($text);
-
-    if (preg_match('/gaussian|splat|3dgs|4dgs|nerf|point.?cloud|colmap|mesh|3d.?reconstruct|gaussiansplatting/i', $t)) return '3dgs';
-    if (preg_match('/virtual.?prod|unreal|led.?stage|icvfx|in.?camera|nDisplay|stagecraft|volume|vp|virtual production/i', $t)) return 'vp';
-    if (preg_match('/comfyui|blender|unity|houdini|mayа|plugin|sdk|app|github|tool|software/i', $t)) return 'tools';
-    if (preg_match('/dm|message|connect|networking|met at|follow|endorse|contact/i', $t)) return 'contact';
-    if (preg_match('/ai|machine.?learn|llm|diffusion|model|neural|deep.?learn|gpt|claude|gemini|sprint|real.?time/i', $t)) return 'ai';
-
+    if (preg_match('/gaussian|splat|3dgs|4dgs|nerf|point.?cloud|colmap|mesh|3d.?reconstruct/i', $t)) return '3dgs';
+    if (preg_match('/virtual.?prod|unreal|led.?stage|icvfx|in.?camera|ndisplay|volume|stagecraft/i', $t))  return 'vp';
+    if (preg_match('/comfyui|blender|unity|houdini|plugin|sdk|github|tool|software|app\b/i', $t))          return 'tools';
+    if (preg_match('/\bdm\b|message|connect|networking|met at|follow|endorse/i', $t))                      return 'contact';
     return 'ai';
 }
 
-function buildSummary($text, $quotedTexts) {
-    // Use quoted texts as the actual content
-    if (!empty($quotedTexts)) {
-        // Filter out very short quotes and author names
-        $content = array_filter($quotedTexts, function($q) {
-            return strlen($q) > 10 && !preg_match('/^[A-Z][a-z]+ [A-Z][a-z]+$/', trim($q));
-        });
-        if (!empty($content)) {
-            $summary = implode(' — ', array_slice($content, 0, 3));
-            return $summary;
+function buildSummaryFromText($text) {
+    // Take first 1-2 meaningful sentences, skipping short/noise lines
+    $lines = preg_split('/\n+/', trim($text));
+    $content = [];
+    foreach ($lines as $line) {
+        $line = trim($line);
+        if (strlen($line) > 30 && !preg_match('/^(https?:|#|@|\d+\s*(likes?|comments?))/i', $line)) {
+            $content[] = $line;
+            if (count($content) >= 2) break;
         }
     }
-
-    // Fallback: extract meaningful sentences from description
-    $sentences = preg_split('/(?<=[.!?])\s+/', $text, -1, PREG_SPLIT_NO_EMPTY);
-    $meaningful = [];
-    foreach ($sentences as $s) {
-        $s = trim($s);
-        // Skip "The image shows..." type sentences
-        if (preg_match('/^(the image|this image|there is|there are|it appears|the screenshot)/i', $s)) continue;
-        if (strlen($s) > 15) $meaningful[] = $s;
-        if (count($meaningful) >= 2) break;
-    }
-
-    return !empty($meaningful) ? implode(' ', $meaningful) : substr($text, 0, 200);
+    return implode(' ', $content) ?: substr($text, 0, 200);
 }
 
-function extractBullets($text, $quotedTexts) {
+function extractBulletsFromText($text) {
     $bullets = [];
-
-    // Extract quoted texts that look like content
-    foreach ($quotedTexts as $qt) {
-        $qt = trim($qt);
-        if (strlen($qt) > 15 && !preg_match('/^[A-Z][a-z]+ [A-Z][a-z]+$/', $qt)) {
-            $bullets[] = $qt;
+    // Lines starting with bullet chars or dashes
+    $lines = preg_split('/\n+/', $text);
+    foreach ($lines as $line) {
+        $line = trim($line);
+        if (preg_match('/^[•\-\*▪➤►]\s+(.+)/', $line, $m) && strlen($m[1]) > 10) {
+            $bullets[] = $m[1];
         }
         if (count($bullets) >= 5) break;
     }
 
-    // If no bullets from quotes, extract key sentences
     if (empty($bullets)) {
-        $sentences = preg_split('/(?<=[.!?])\s+/', $text, -1, PREG_SPLIT_NO_EMPTY);
-        foreach ($sentences as $s) {
-            $s = trim($s);
-            if (preg_match('/^(the image|this image|there is|there are)/i', $s)) continue;
-            if (strlen($s) > 20) $bullets[] = $s;
-            if (count($bullets) >= 3) break;
+        // Fall back to mid-length lines as implicit bullets
+        foreach ($lines as $line) {
+            $line = trim($line);
+            if (strlen($line) > 20 && strlen($line) < 150 && !preg_match('/^https?:/', $line)) {
+                $bullets[] = $line;
+            }
+            if (count($bullets) >= 4) break;
         }
     }
 
     return $bullets;
 }
 
-function extractLinks($text) {
+function extractLinksFromText($text) {
     $links = [];
-
-    // Match full URLs
-    if (preg_match_all('/(https?:\/\/[^\s<>"\')]+)/i', $text, $m)) {
+    if (preg_match_all('/(https?:\/\/[^\s<>"\')\]]+)/i', $text, $m)) {
         foreach ($m[1] as $url) {
-            $url = rtrim($url, '.,;:)');
+            $url  = rtrim($url, '.,;:)');
             $host = parse_url($url, PHP_URL_HOST) ?: $url;
             $links[] = ['l' => $host, 'u' => $url, 't' => ''];
         }
     }
-
-    // Match www. URLs
-    if (preg_match_all('/(www\.[^\s<>"\')]+)/i', $text, $m)) {
-        foreach ($m[1] as $url) {
-            $url = rtrim($url, '.,;:)');
-            if (strpos($url, 'http') !== 0) $url = 'https://' . $url;
-            $host = parse_url($url, PHP_URL_HOST) ?: $url;
-            $links[] = ['l' => $host, 'u' => $url, 't' => ''];
+    if (preg_match_all('/([a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,})/', $text, $m)) {
+        foreach ($m[1] as $email) {
+            $links[] = ['l' => $email, 'u' => 'mailto:' . $email, 't' => 'co'];
         }
     }
-
     return $links;
-}
-
-function extractHashtags($text) {
-    $hashtags = [];
-    if (preg_match_all('/#([a-zA-Z0-9_]+)/', $text, $m)) {
-        $hashtags = $m[1];
-    }
-    return $hashtags;
 }
 ?>
