@@ -1,0 +1,11 @@
+# Protect sensitive files
+<FilesMatch "^(config\.php)$">
+    Order allow,deny
+    Deny from all
+</FilesMatch>
+
+# Enable mod_rewrite for clean URLs if needed
+RewriteEngine On
+
+# Allow direct access to api directory for AJAX calls
+RewriteRule ^api/.* - [L]

@@ -1,0 +1,21 @@
+# Database
+data/posts.db
+data/*.db-journal
+data/*.db-wal
+data/*.db-shm
+
+# Uploaded images (user content)
+html/uploads/*
+!html/uploads/.gitkeep
+
+# API keys
+html/api/config.php
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editor
+*.swp
+*.swo
+*~

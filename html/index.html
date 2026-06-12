@@ -1,0 +1,718 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LinkedIn Feed Intel</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;600;700;800&display=swap');
+:root{--bg:#07070d;--surf:#0e0e18;--surf2:#13131f;--bd:#1c1c2e;--bd2:#252538;--g:#00ffa3;--r:#ff3e6c;--b:#3d9bff;--y:#ffb800;--p:#b57bff;--tx:#ddddf0;--mu:#4a4a6a;--mu2:#7070a0}
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:var(--bg);color:var(--tx);font-family:'Syne',sans-serif;min-height:100vh;overflow-x:hidden}
+body::after{content:'';position:fixed;inset:0;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.025'/%3E%3C/svg%3E");pointer-events:none;z-index:9000}
+.amb{position:fixed;border-radius:50%;filter:blur(90px);pointer-events:none;z-index:0}
+#amb1{width:500px;height:500px;background:rgba(0,255,163,.04);top:-120px;left:-120px}
+#amb2{width:400px;height:400px;background:rgba(61,155,255,.04);bottom:-80px;right:-80px}
+.shell{position:relative;z-index:1;max-width:1400px;margin:0 auto;padding:0 1.5rem 4rem}
+
+/* HEADER */
+header{padding:2rem 0 1.4rem;border-bottom:1px solid var(--bd);display:flex;align-items:flex-end;justify-content:space-between;flex-wrap:wrap;gap:1rem}
+.logo h1{font-size:clamp(1.6rem,3.5vw,2.5rem);font-weight:800;letter-spacing:-.04em;color:#fff;line-height:1}
+.logo h1 em{color:var(--g);font-style:normal}
+.logo p{font-family:'Space Mono',monospace;font-size:.6rem;color:var(--mu);text-transform:uppercase;letter-spacing:.14em;margin-top:.45rem}
+.hstats{display:flex;gap:1.5rem}
+.hstat{text-align:right}
+.hstat-n{font-family:'Space Mono',monospace;font-size:1.4rem;font-weight:700;color:var(--g);line-height:1}
+.hstat-l{font-size:.62rem;color:var(--mu);text-transform:uppercase;letter-spacing:.1em}
+
+/* UPLOAD */
+.upzone{margin:1.4rem 0;border:1px dashed var(--bd2);border-radius:6px;padding:1.3rem 1.6rem;display:flex;align-items:center;gap:1.1rem;cursor:pointer;transition:all .2s;background:var(--surf)}
+.upzone:hover,.upzone.drag{border-color:var(--g);background:rgba(0,255,163,.03)}
+.upzone input{display:none}
+.upicon{width:38px;height:38px;border:1px solid var(--bd2);border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:1.1rem;flex-shrink:0;transition:border-color .2s}
+.upzone:hover .upicon{border-color:var(--g)}
+.uptxt strong{display:block;font-size:.88rem;color:#fff;margin-bottom:.18rem}
+.uptxt span{font-family:'Space Mono',monospace;font-size:.6rem;color:var(--mu);text-transform:uppercase;letter-spacing:.1em}
+
+/* ANALYZING BAR */
+#abar{display:none;align-items:center;gap:.8rem;padding:.75rem 1.1rem;background:rgba(0,255,163,.05);border:1px solid rgba(0,255,163,.15);border-radius:4px;margin-bottom:.9rem;font-family:'Space Mono',monospace;font-size:.68rem;color:var(--g)}
+#abar.on{display:flex}
+.pdot{width:8px;height:8px;border-radius:50%;background:var(--g);animation:pulse 1s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.2}}
+
+/* CONTROLS */
+.ctrls{display:flex;align-items:center;gap:.55rem;margin-bottom:1.1rem;flex-wrap:wrap}
+.fbtn{font-family:'Space Mono',monospace;font-size:.6rem;text-transform:uppercase;letter-spacing:.08em;padding:5px 11px;border-radius:2px;border:1px solid var(--bd2);background:transparent;color:var(--mu2);cursor:pointer;transition:all .2s}
+.fbtn:hover{color:#fff;border-color:var(--mu2)}
+.fbtn.on{color:var(--bg);background:var(--g);border-color:var(--g)}
+.vtog{margin-left:auto;display:flex;gap:.35rem}
+.vbtn{width:28px;height:28px;border:1px solid var(--bd2);background:transparent;cursor:pointer;display:flex;align-items:center;justify-content:center;border-radius:2px;color:var(--mu);transition:all .2s;font-size:.85rem}
+.vbtn.on,.vbtn:hover{border-color:var(--b);color:var(--b)}
+
+/* CHART */
+.chart{background:var(--surf);border:1px solid var(--bd);border-radius:4px;padding:1.1rem 1.4rem;margin-bottom:1.4rem}
+.chart h2{font-family:'Space Mono',monospace;font-size:.6rem;text-transform:uppercase;letter-spacing:.12em;color:var(--mu);margin-bottom:.9rem}
+.bars{display:flex;flex-direction:column;gap:.65rem}
+.brow{display:grid;grid-template-columns:130px 1fr 26px;align-items:center;gap:.75rem}
+.blbl{font-size:.72rem;color:var(--mu2);text-align:right}
+.btrk{height:7px;background:rgba(255,255,255,.04);border-radius:2px;overflow:hidden}
+.bfil{height:100%;border-radius:2px;transition:width .6s cubic-bezier(.4,0,.2,1)}
+.bcnt{font-family:'Space Mono',monospace;font-size:.62rem;color:var(--mu)}
+
+/* GRID */
+#grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:1.1rem}
+#grid.lv{grid-template-columns:1fr}
+
+/* CARD */
+.card{background:var(--surf);border:1px solid var(--bd);border-radius:4px;position:relative;overflow:hidden;cursor:pointer;transition:border-color .2s,transform .2s;animation:cin .35s ease both}
+@keyframes cin{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+.card:hover{transform:translateY(-2px)}
+.card.c3{border-left:2px solid var(--g)}.card.cv{border-left:2px solid var(--b)}.card.ca{border-left:2px solid var(--p)}.card.ct{border-left:2px solid var(--y)}.card.cc{border-left:2px solid var(--r)}
+.card:hover.c3{border-color:var(--g)}.card:hover.cv{border-color:var(--b)}.card:hover.ca{border-color:var(--p)}.card:hover.ct{border-color:var(--y)}.card:hover.cc{border-color:var(--r)}
+.cthumb{width:100%;height:110px;object-fit:cover;object-position:top;display:block;border-bottom:1px solid var(--bd);opacity:.7;transition:opacity .2s}
+.card:hover .cthumb{opacity:1}
+.cin{padding:1rem 1.1rem}
+.ctop{display:flex;align-items:flex-start;justify-content:space-between;gap:.55rem;margin-bottom:.6rem}
+.csrc{font-weight:700;font-size:.8rem;color:#fff;line-height:1.2}
+.ctime{font-family:'Space Mono',monospace;font-size:.56rem;color:var(--mu);margin-top:.15rem}
+.ctag{font-family:'Space Mono',monospace;font-size:.56rem;text-transform:uppercase;letter-spacing:.07em;padding:2px 7px;border-radius:2px;white-space:nowrap;flex-shrink:0}
+.ctag.c3{background:rgba(0,255,163,.1);color:var(--g);border:1px solid rgba(0,255,163,.2)}
+.ctag.cv{background:rgba(61,155,255,.1);color:var(--b);border:1px solid rgba(61,155,255,.2)}
+.ctag.ca{background:rgba(181,123,255,.1);color:var(--p);border:1px solid rgba(181,123,255,.2)}
+.ctag.ct{background:rgba(255,184,0,.1);color:var(--y);border:1px solid rgba(255,184,0,.2)}
+.ctag.cc{background:rgba(255,62,108,.1);color:var(--r);border:1px solid rgba(255,62,108,.2)}
+.csum{font-size:.78rem;color:#8080a8;line-height:1.55;margin-bottom:.65rem}
+.cbul{list-style:none;margin-bottom:.75rem}
+.cbul li{font-size:.72rem;color:var(--mu2);padding:.17rem 0 .17rem .85rem;position:relative;line-height:1.35}
+.cbul li::before{content:'›';position:absolute;left:0;color:var(--mu)}
+.clnks{display:flex;flex-wrap:wrap;gap:.35rem;margin-top:.1rem}
+.lnk{display:inline-flex;align-items:center;gap:.3rem;font-family:'Space Mono',monospace;font-size:.6rem;text-decoration:none;padding:4px 10px;border-radius:3px;border:1px solid var(--bd2);color:var(--mu2);background:rgba(255,255,255,.02);transition:all .18s;letter-spacing:.04em;line-height:1}
+.lnk:hover{color:#fff;border-color:var(--b);background:rgba(61,155,255,.08);transform:translateY(-1px)}
+.lnk.pr{color:var(--g);border-color:rgba(0,255,163,.3);background:rgba(0,255,163,.05)}.lnk.pr:hover{background:rgba(0,255,163,.12);border-color:var(--g)}
+.lnk.co{color:var(--r);border-color:rgba(255,62,108,.3);background:rgba(255,62,108,.05)}.lnk.co:hover{background:rgba(255,62,108,.12)}
+.cdel{position:absolute;top:.45rem;right:.45rem;width:20px;height:20px;background:rgba(255,62,108,.1);border:1px solid rgba(255,62,108,.2);border-radius:2px;color:var(--r);font-size:.65rem;cursor:pointer;display:none;align-items:center;justify-content:center;z-index:5;transition:background .15s;line-height:1}
+.card:hover .cdel{display:flex}
+.cdel:hover{background:rgba(255,62,108,.25)}
+.empty{text-align:center;padding:4rem 2rem;color:var(--mu);font-size:.82rem;grid-column:1/-1}
+.empty strong{display:block;font-size:1.05rem;color:var(--mu2);margin-bottom:.4rem}
+
+/* MODAL */
+.moverlay{display:none;position:fixed;inset:0;background:rgba(7,7,13,.93);z-index:500;align-items:center;justify-content:center;padding:1.5rem;backdrop-filter:blur(6px)}
+.moverlay.on{display:flex}
+.mdlg{background:var(--surf2);border:1px solid var(--bd2);border-radius:6px;max-width:620px;width:100%;max-height:85vh;overflow-y:auto;position:relative;animation:min .2s ease}
+@keyframes min{from{opacity:0;transform:scale(.97)}}
+.mclose{position:sticky;top:.7rem;float:right;margin:.7rem .7rem 0 0;width:26px;height:26px;background:var(--surf);border:1px solid var(--bd2);border-radius:3px;color:var(--mu2);cursor:pointer;font-size:.85rem;display:flex;align-items:center;justify-content:center;z-index:5}
+.mclose:hover{color:#fff}
+.mbody{padding:1.3rem;clear:both}
+.mimg{width:100%;border-radius:4px;margin-bottom:.9rem;border:1px solid var(--bd)}
+.msrc{font-size:1.05rem;font-weight:700;color:#fff;margin-bottom:.25rem}
+.mmeta{font-family:'Space Mono',monospace;font-size:.6rem;color:var(--mu);margin-bottom:.9rem;text-transform:uppercase;letter-spacing:.1em}
+.msum{font-size:.83rem;color:var(--mu2);line-height:1.65;margin-bottom:.9rem}
+.mbul{list-style:none;margin-bottom:1rem}
+.mbul li{font-size:.78rem;color:var(--mu2);padding:.22rem 0 .22rem .9rem;border-bottom:1px solid var(--bd);position:relative;line-height:1.4}
+.mbul li::before{content:'›';position:absolute;left:0;color:var(--g)}
+.mlnks{display:flex;flex-wrap:wrap;gap:.45rem}
+/* DUP DIALOG */
+#dupov{display:none;position:fixed;inset:0;background:rgba(7,7,13,.95);z-index:600;align-items:center;justify-content:center;padding:1.5rem;backdrop-filter:blur(8px)}
+#dupov.on{display:flex}
+.ddlg{background:var(--surf2);border:1px solid rgba(255,184,0,.3);border-radius:6px;max-width:560px;width:100%;padding:1.5rem;animation:min .2s ease}
+.ddhdr{display:flex;align-items:center;gap:.75rem;margin-bottom:1.1rem}
+.ddico{width:34px;height:34px;background:rgba(255,184,0,.1);border:1px solid rgba(255,184,0,.25);border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:1rem;flex-shrink:0}
+.ddtitle{font-size:.95rem;font-weight:700;color:#fff}
+.ddsub{font-family:'Space Mono',monospace;font-size:.58rem;color:var(--y);text-transform:uppercase;letter-spacing:.1em;margin-top:.15rem}
+.ddcmp{display:grid;grid-template-columns:1fr 1fr;gap:.75rem;margin-bottom:1rem}
+.ddpan{background:var(--surf);border:1px solid var(--bd);border-radius:4px;overflow:hidden}
+.ddplbl{font-family:'Space Mono',monospace;font-size:.56rem;text-transform:uppercase;letter-spacing:.1em;padding:.35rem .65rem;border-bottom:1px solid var(--bd);color:var(--mu)}
+.ddpan.ex .ddplbl{color:var(--b)}.ddpan.nw .ddplbl{color:var(--y)}
+.ddpimg{width:100%;height:85px;object-fit:cover;object-position:top;display:block;opacity:.8}
+.ddpbdy{padding:.55rem .65rem}
+.ddpsrc{font-size:.72rem;font-weight:600;color:#fff;margin-bottom:.18rem}
+.ddptxt{font-size:.65rem;color:var(--mu2);line-height:1.35}
+.ddreasns{display:flex;flex-wrap:wrap;gap:.35rem;margin-bottom:.9rem}
+.drtag{font-family:'Space Mono',monospace;font-size:.56rem;padding:2px 8px;border-radius:2px;background:rgba(255,184,0,.08);border:1px solid rgba(255,184,0,.2);color:var(--y);text-transform:uppercase;letter-spacing:.06em}
+.ddscore{text-align:center;margin-bottom:1.1rem}
+.ddslbl{font-family:'Space Mono',monospace;font-size:.6rem;color:var(--mu);text-transform:uppercase;letter-spacing:.08em}
+.ddspct{font-family:'Space Mono',monospace;font-size:.9rem;color:var(--y);font-weight:700;margin:.2rem 0}
+.ddstrk{height:4px;background:var(--bd);border-radius:2px;overflow:hidden}
+.ddsfil{height:100%;background:var(--y);border-radius:2px;transition:width .5s ease}
+.ddacts{display:flex;gap:.55rem;justify-content:flex-end}
+.ddbtn{font-family:'Space Mono',monospace;font-size:.63rem;text-transform:uppercase;letter-spacing:.08em;padding:7px 15px;border-radius:2px;cursor:pointer;border:1px solid var(--bd2);background:transparent;color:var(--mu2);transition:all .2s}
+.ddbtn:hover{color:#fff;border-color:var(--mu2)}
+.ddbtn.add{background:rgba(255,184,0,.1);border-color:rgba(255,184,0,.3);color:var(--y)}
+.ddbtn.add:hover{background:rgba(255,184,0,.2)}
+
+::-webkit-scrollbar{width:4px}
+::-webkit-scrollbar-track{background:var(--bg)}
+::-webkit-scrollbar-thumb{background:var(--bd2);border-radius:2px}
+</style>
+</head>
+<body>
+
+<div class="amb" id="amb1"></div>
+<div class="amb" id="amb2"></div>
+
+<div class="shell">
+  <header>
+    <div class="logo">
+      <h1>LinkedIn <em>Feed Intel</em></h1>
+      <p>AI-powered · VP + 3DGS + Tools · Drop screenshots to analyze</p>
+    </div>
+    <div class="hstats">
+      <div class="hstat"><div class="hstat-n" id="statPosts">0</div><div class="hstat-l">Posts</div></div>
+      <div class="hstat"><div class="hstat-n" id="statLinks">0</div><div class="hstat-l">Links</div></div>
+    </div>
+  </header>
+
+  <div class="upzone" id="upzone">
+    <input type="file" id="filein" accept="image/*" multiple>
+    <div class="upicon">📸</div>
+    <div class="uptxt">
+      <strong>Drop LinkedIn screenshots here — or click to browse</strong>
+      <span>PNG · JPG · Multiple files OK · Local OCR + MiMo structures each one</span>
+    </div>
+  </div>
+
+  <div id="abar">
+    <div class="pdot"></div>
+    <span id="atxt">Analyzing…</span>
+  </div>
+
+  <div class="chart">
+    <h2>Posts by Category</h2>
+    <div class="bars" id="chartbars"></div>
+  </div>
+
+  <div class="ctrls">
+    <button class="fbtn on" data-cat="all">All</button>
+    <button class="fbtn" data-cat="3dgs">3D / GS</button>
+    <button class="fbtn" data-cat="vp">Virtual Prod</button>
+    <button class="fbtn" data-cat="ai">AI Workflow</button>
+    <button class="fbtn" data-cat="tools">Tools</button>
+    <button class="fbtn" data-cat="contact">Contacts</button>
+    <div class="vtog">
+      <button class="vbtn on" id="vgrid">⊞</button>
+      <button class="vbtn" id="vlist">☰</button>
+    </div>
+  </div>
+
+  <div id="grid"></div>
+</div>
+
+<!-- Card Modal -->
+<div class="moverlay" id="moverlay">
+  <div class="mdlg">
+    <button class="mclose" id="mclose">✕</button>
+    <div class="mbody" id="mbody"></div>
+  </div>
+</div>
+
+<!-- Duplicate Dialog -->
+<div id="dupov">
+  <div class="ddlg">
+    <div class="ddhdr">
+      <div class="ddico">⚠️</div>
+      <div>
+        <div class="ddtitle">Possible Duplicate Detected</div>
+        <div class="ddsub">This screenshot may already exist in your feed</div>
+      </div>
+    </div>
+    <div class="ddcmp">
+      <div class="ddpan ex">
+        <div class="ddplbl">Existing</div>
+        <img class="ddpimg" id="deximg" src="" alt="">
+        <div class="ddpbdy">
+          <div class="ddpsrc" id="dexsrc"></div>
+          <div class="ddptxt" id="dextxt"></div>
+        </div>
+      </div>
+      <div class="ddpan nw">
+        <div class="ddplbl">Incoming</div>
+        <img class="ddpimg" id="dnwimg" src="" alt="">
+        <div class="ddpbdy">
+          <div class="ddpsrc" id="dnwsrc"></div>
+          <div class="ddptxt" id="dnwtxt"></div>
+        </div>
+      </div>
+    </div>
+    <div class="ddreasns" id="dreasns"></div>
+    <div class="ddscore">
+      <div class="ddslbl">Similarity Score</div>
+      <div class="ddspct" id="dspct">0%</div>
+      <div class="ddstrk"><div class="ddsfil" id="dsfil" style="width:0%"></div></div>
+    </div>
+    <div class="ddacts">
+      <button class="ddbtn" id="dskip">Skip — it's a duplicate</button>
+      <button class="ddbtn add" id="dadd">Add anyway</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── SEED DATA ──────────────────────────────────────────────────────
+const SEED = [
+  { id:'s1', cat:'3dgs', ts:'2026-03-13T15:59', source:'4DGS Streaming · Georgiivysotskii',
+    summary:'4D Gaussian Splatting streams progressively — no downloads, no length limits. Runs on 4-year-old Android tablet over 5G mobile.',
+    bullets:['75 Mbps compressed stream, 17 Mbps for simpler content','WebXR + WebGPU — browser-native, no app','4DGS 360 ComfyUI node in development (commercial license)','Enterprise: RAW data for model training available'],
+    links:[
+      {l:'store.gracia.ai',u:'https://store.gracia.ai',t:'pr'},
+      {l:'4DGS ComfyUI waitlist',u:'https://www.linkedin.com/posts/georgiivysotskii_4dgs-comfyui-gaussiansplatting-activity',t:''},
+      {l:'Book a call',u:'https://www.linkedin.com/in/georgiivysotskii/',t:''}
+    ] },
+  { id:'s2', cat:'vp', ts:'2026-03-13T13:36', source:'Taos Whittaker · Sr. UE Tech',
+    summary:'Workflow converting 2D images to 2.5D environments in Unreal for VP, now testing real-world photography (Marina One, Singapore).',
+    bullets:['Apple SHARP for depth/3DGS generation','ComfyUI SHARP custom nodes','XGrids LCC Unreal SDK'],
+    links:[
+      {l:'Apple SHARP (GitHub)',u:'https://github.com/apple/ml-depth-pro',t:'pr'},
+      {l:'ComfyUI SHARP nodes',u:'https://github.com/kijai/ComfyUI-DepthAnythingV2',t:''},
+      {l:'XGrids LCC SDK',u:'https://www.xgrids.com/',t:''}
+    ] },
+  { id:'s3', cat:'ai', ts:'2026-03-13T11:29', source:'GenAI Post-Production Quality',
+    summary:'Blueprint for making GenAI survive Tier-1 distribution — bypassing 8-bit encoders, dumping 16-bit float VAE latent space directly into DaVinci.',
+    bullets:['Luma 32-bit EXR wrappers','Topaz Labs mathematical pipeline recovery','ComfyUI Glass Pipeline → DaVinci Resolve','Targets Post Supervisors, Colorists, AI Filmmakers'],
+    links:[
+      {l:'Luma AI',u:'https://lumalabs.ai',t:'pr'},
+      {l:'Topaz Labs',u:'https://www.topazlabs.com',t:''},
+      {l:'ComfyUI',u:'https://github.com/comfyanonymous/ComfyUI',t:''}
+    ] },
+  { id:'s4', cat:'3dgs', ts:'2026-03-13T10:55', source:'Gaussian SplatKing · Mobile App',
+    summary:'Mobile app for capturing 3DGS data, launched at NVIDIA GTC with RTX PRO 6000 96GB VRAM giveaway.',
+    bullets:['Mobile-first 3DGS capture workflow','NVIDIA-sponsored launch'],
+    links:[
+      {l:'Gaussian SplatKing (iOS)',u:'https://apps.apple.com/app/gaussian-splatking',t:'pr'},
+      {l:'NVIDIA GTC',u:'https://www.nvidia.com/gtc/',t:''}
+    ] },
+  { id:'s5', cat:'ai', ts:'2026-03-13T10:56', source:'Gemini Multimodal Embedding + Claude Code',
+    summary:'Gemini multimodal embedding ingests text, image, video, audio & docs. Combined with Claude Code, built a RAG chatbot in 15 min.',
+    bullets:['Pulls exact images from documents when queried','Zero hallucinations via RAG grounding','Claude Code full pipeline in one prompt','Free tier via Pinecone'],
+    links:[
+      {l:'Gemini Embedding docs',u:'https://ai.google.dev/gemini-api/docs/embeddings',t:'pr'},
+      {l:'Pinecone free tier',u:'https://www.pinecone.io',t:''},
+      {l:'Claude Code',u:'https://claude.ai/code',t:''}
+    ] },
+  { id:'s6', cat:'contact', ts:'2026-03-13T16:07', source:'Mike Foster · Origintrak',
+    summary:'Follow-up DM — met at WePlay. Wants to visit DMPC studio and see the Ocellus camera. Two messages: Jan 29 + Aug 26 2025.',
+    bullets:['Specifically interested in Ocellus testing','Reached out twice — persistent, genuine interest'],
+    links:[
+      {l:'MikeFoster@Origintrak.com',u:'mailto:MikeFoster@Origintrak.com',t:'co'},
+      {l:'Origintrak.com',u:'https://www.origintrak.com',t:''}
+    ] },
+  { id:'s7', cat:'vp', ts:'2026-03-13T16:17', source:'Henry Stuart · VISUALISE',
+    summary:'AI VFX pipeline: studio-filmed people placed into historically accurate 360° environments using ComfyUI + Kling + Nano Banana + compositing.',
+    bullets:['HMS Victory upper deck — 1805 recreation','360° photogrammetry on actual ship, Portsmouth','AI costume + character generation','Traditional VFX compositing final layer'],
+    links:[
+      {l:'VISUALISE website',u:'https://visualise.com',t:'pr'},
+      {l:'Kling AI',u:'https://klingai.com',t:''},
+      {l:'ComfyUI Nano Banana',u:'https://github.com/comfyanonymous/ComfyUI',t:''}
+    ] },
+  { id:'s8', cat:'3dgs', ts:'2026-03-13T16:01', source:'Paul Hansen · Microsoft Trellis2',
+    summary:'Trellis2 is open-source MIT-licensed image-to-3D model on par with paid APIs. O-voxel architecture computes geometry + materials simultaneously.',
+    bullets:['ComfyUI integration via Bruno Fargnoli custom nodes','Local generation — no API costs','Tested in Lighthouse AI Academy cohort'],
+    links:[
+      {l:'Trellis2 (GitHub)',u:'https://github.com/microsoft/TRELLIS',t:'pr'},
+      {l:'ComfyUI Trellis nodes',u:'https://github.com/brunofargnoli/ComfyUI-TRELLIS',t:''},
+      {l:'Lighthouse AI Academy',u:'https://www.lighthouseai.academy',t:''}
+    ] },
+  { id:'s9', cat:'ai', ts:'2026-03-13T16:07', source:'Luma AI · Creative Agents',
+    summary:'Luma Creative Agents used by The Generation Company to produce a 60-second spot in 7 days with full team collaboration and shared context.',
+    bullets:['Full team collaboration through AI agent layer','Credits: CD, Director, Lead AI Artist, Editor, VFX'],
+    links:[
+      {l:'Luma Creative Agents',u:'https://lumalabs.ai/dream-machine',t:'pr'},
+      {l:'The Generation Company',u:'https://www.thegenerationcompany.com',t:''}
+    ] },
+  { id:'s10', cat:'tools', ts:'2026-03-13T16:04', source:'ComfyUI Official · ElevenLabs',
+    summary:'ElevenLabs voice generation now available inside ComfyUI as Partner Nodes — no external API wiring needed.',
+    bullets:['Native ComfyUI Partner Node','Direct fit for seminar voiceover workflows'],
+    links:[
+      {l:'ElevenLabs',u:'https://elevenlabs.io',t:'pr'},
+      {l:'ComfyUI Partner Nodes',u:'https://github.com/comfyanonymous/ComfyUI',t:''}
+    ] },
+  { id:'s11', cat:'3dgs', ts:'2026-03-16T10:46', source:'Radiance Fields (Gaussian Splatting)',
+    summary:'COLMAP 4.0 released with major upgrades to camera pose estimation and 3D reconstruction — GLOMAP integrated, ALIKED/LightGlue via ONNX, textured mesh generation, and faster bundle adjustment.',
+    bullets:['GLOMAP now integrated as alternative mapper','ALIKED features + LightGlue matching via ONNX','Bundle adjustment & image I/O significantly optimized','New Python bindings: feature extraction, depth/normal maps','Mesh workflows: textured mesh generation + simplification in-pipeline'],
+    links:[
+      {l:'COLMAP 4.0 article',u:'https://colmap.github.io',t:'pr'},
+      {l:'Changelog',u:'https://github.com/colmap/colmap/releases',t:''},
+      {l:'COLMAP GitHub',u:'https://github.com/colmap/colmap',t:''}
+    ] },
+
+  { id:'s12', cat:'tools', ts:'2026-03-16T04:33', source:'Microsoft Copilot Studio · Agent Dev Workflow',
+    summary:'Tools-to-Build-Tools approach: use Copilot inside VS Code to draft agent logic and instructions in code — 10x faster than web forms. Deploy Enterprise Agent Squads at scale.',
+    bullets:['Build agent logic in VS Code with GitHub Copilot','Clone → Edit → Upload via Copilot Studio Extensions instantly','Workflow: VS Code → Test locally → Deploy to Copilot Studio → Finalise UI','Secret: use agents to build agents (PowerCAT method)'],
+    links:[
+      {l:'Copilot Studio',u:'https://www.microsoft.com/en-us/microsoft-copilot/microsoft-copilot-studio',t:'pr'},
+      {l:'PowerCAT',u:'https://github.com/microsoft/powercat-creator-kit',t:''},
+      {l:'VS Code',u:'https://code.visualstudio.com',t:''}
+    ] },
+
+  { id:'s13', cat:'ai', ts:'2026-03-05T18:51', source:'Korea JoongAng Daily · AI Film',
+    summary:'Korea set to release its first completely AI-generated full-length film "I\'m PoPo" in May 2026 — 100% AI video production, a landmark moment for AI cinema globally.',
+    bullets:['First 100% AI-generated feature film from South Korea','Title: "I\'m PoPo" (아이엠포포)','Release: May 2026','Signals commercial viability of fully AI-generated long-form content'],
+    links:[
+      {l:'Korea JoongAng Daily',u:'https://koreajoongangdaily.joins.com',t:'pr'}
+    ] },
+
+  { id:'s14', cat:'ai', ts:'2026-03-09T11:01', source:'Jason Zada · Founder & Director',
+    summary:'"The Heist 3" — over 6 minutes, set in 1980s Miami\'s Little Havana, built with an entirely new AI process. Shot-by-shot iteration, not a one-click generation.',
+    bullets:['6+ minute AI film — most ambitious yet','1980s Miami Little Havana setting','Compared to The Heist (Dec 2024, Veo2) — quality leap is massive','Demonstrates what AI storytelling looks like with serious craft and iteration'],
+    links:[
+      {l:'Jason Zada LinkedIn',u:'https://www.linkedin.com/in/jasonzada',t:'pr'}
+    ] },
+
+  { id:'s15', cat:'ai', ts:'2026-03-16T10:47', source:'Thiago Carneiro · VES Member / Unreal',
+    summary:'Anthropic just released 13+ free self-paced AI courses via Anthropic Academy — covering Claude Code, API usage, and AI fundamentals. No cost, no certificate program needed.',
+    bullets:['13+ free self-paced AI courses from Anthropic','Includes Claude Code course','Available at anthropic.skilljar.com','VES member highlighting it for film/VFX community'],
+    links:[
+      {l:'Anthropic Academy courses',u:'https://anthropic.skilljar.com',t:'pr'},
+      {l:'Anthropic learning resources',u:'https://www.anthropic.com/learn',t:''}
+    ] },
+
+  { id:'s16', cat:'vp', ts:'2026-03-16T10:48', source:'Fragments Studio · AI Video Generation',
+    summary:'Fragments Studio generates AI video from scene data — not text prompts. Motion and camera are the source of truth. Animators define the performance; AI resolves the final image from authored motion.',
+    bullets:['Scene data + camera animation drives generation (not prompts)','Character animation imported via FBX — AI follows exactly','Exact camera control, predictable repeatable results','Animators becoming the primary creative force again','Video → frames → PLY pipeline planned for open source'],
+    links:[
+      {l:'Fragments Studio',u:'https://www.fragments.studio',t:'pr'}
+    ] },
+
+  { id:'s17', cat:'ai', ts:'2026-03-03T07:57', source:'Decart · Lucy 2.0 API',
+    summary:'Decart\'s Lucy 2.0 is now available via API — their most powerful realtime model yet. Powers virtual try-ons, streaming apps, home design, live product placement, all in true realtime.',
+    bullets:['Realtime AI image/video model via API','Use cases: virtual try-ons, streaming, live product placement','Open source Virtual Try-ons project available','Enterprise & collaboration contact: contact@decart.ai'],
+    links:[
+      {l:'Decart platform',u:'https://www.decart.ai',t:'pr'},
+      {l:'Virtual Try-ons OSS',u:'https://github.com/deepinsight/insightface',t:''},
+      {l:'contact@decart.ai',u:'mailto:contact@decart.ai',t:'co'}
+    ] },
+
+  { id:'s18', cat:'ai', ts:'2026-03-16T10:27', source:'AI Evolution · Perfect Claude Prompt',
+    summary:'"Anatomy of a Perfect Claude Prompt" by Hamza Khalid — structured framework with 6 sections: Task+Identity, Context Files, Reference, Success Brief, Pre-Flight Check, Execution Plan.',
+    bullets:['Task + Identity: I want to [TASK] so that [SUCCESS CRITERIA]','Success Brief section alone makes outputs 10x better — never skip it','Pre-Flight: List 3 rules, identify unclear items, name biggest risk','Execution Plan: Only begin work once I say "Go"','Works with Claude Opus 4.6 and Sonnet 4.5 with Projects + context files'],
+    links:[
+      {l:'how-to-ai.guide',u:'https://how-to-ai.guide',t:'pr'}
+    ] },
+
+  { id:'s19', cat:'3dgs', ts:'2026-03-11T10:31', source:'Nicholas Markowitz · Chief Experience Officer',
+    summary:'Gaussian Splats now being discussed and integrated into ArcGIS workflows at #EsriEPC26. GIS + 3DGS convergence — game-changing for how people capture and use 3D data at scale.',
+    bullets:['Gaussian Splats integrated into ArcGIS at Esri Partner Conference 2026','Esri product leads + Andrew Milanes + Es2 presenting','Reality Mapping for GIS: Drone, Aerial, Satellite → Gaussian Splats','Outputs: 3D Meshes, True Orthos, Point Clouds, Gaussian Splats','Massively scalable local-to-national coverage'],
+    links:[
+      {l:'Esri ArcGIS',u:'https://www.esri.com/en-us/arcgis/about-arcgis/overview',t:'pr'},
+      {l:'Es2 website',u:'https://www.es2.co',t:''}
+    ] },
+
+  { id:'s20', cat:'tools', ts:'2026-03-16T10:43', source:'ComfyUI Official · App Mode',
+    summary:'ComfyUI App Mode is now live — pick a workflow, switch to App Mode, run it without touching nodes. Removes all friction for non-technical users running and sharing workflows.',
+    bullets:['App Mode: no node editing needed to run workflows','Pick workflow → switch to App Mode — that simple','Theoretically Media walkthrough guide available','Whether new or seasoned user, App Mode removes startup friction'],
+    links:[
+      {l:'ComfyUI App Mode',u:'https://www.comfy.org',t:'pr'},
+      {l:'Theoretically Media walkthrough',u:'https://www.youtube.com/@TheoreticallyMedia',t:''}
+    ] },
+
+  { id:'s21', cat:'vp', ts:'2026-03-02T09:37', source:'Tahir Palali · Fragments Studio',
+    summary:'Proxy models for AI renders are a gamechanger for previz, animatics, look dev, art direction and Virtual Production. High-res proxy models give higher precision, production-ready, repeatable workflows.',
+    bullets:['Proxy model → AI render workflow for VP and previz','High-res models = higher precision + repeatable results','Fragments Studio nearing full launch (scaling infra slowly)','Early access available — contact Tahir directly'],
+    links:[
+      {l:'Fragments Studio',u:'https://www.fragments.studio',t:'pr'}
+    ] },
+
+  { id:'s22', cat:'ai', ts:'2026-03-16T10:25', source:'Investor AI · Claude Memory Import',
+    summary:'Claude now supports importing your entire memory from ChatGPT, Gemini, or any AI in 60 seconds. Two steps: copy prompt into old AI → paste output into Claude\'s memory settings.',
+    bullets:['Import memory from any AI at claude.com/import-memory','Step 1: Paste prompt into ChatGPT → get full memory export','Step 2: Paste into Claude Settings → Memory → Save','First conversation already feels personalized — no repeating yourself','Works with Cowork for max power'],
+    links:[
+      {l:'claude.com/import-memory',u:'https://claude.com/import-memory',t:'pr'},
+      {l:'Claude settings',u:'https://claude.ai/settings',t:''}
+    ] },
+
+  { id:'s23', cat:'3dgs', ts:'2026-03-09T07:23', source:'Dazai Chen · Creative Technologist',
+    summary:'Custom Compute Shader plugin for Unreal Engine 5 plays 4DGS PLY sequences at 60 FPS, rendering 1.18M gaussians per frame in real-time. PLY sequences generated from video via Apple ML-Sharp.',
+    bullets:['60 FPS real-time 4DGS in Unreal Engine 5 via custom Compute Shader plugin','Renders 1.18M gaussians per frame','PLY sequences generated from video using Apple ML-Sharp','Automated pipeline: video → frames → PLY sequences (planning to open source)','Previously rendered offline in SuperSplat — now fully real-time'],
+    links:[
+      {l:'Apple ML-Sharp (GitHub)',u:'https://github.com/apple/ml-sharp',t:'pr'},
+      {l:'SuperSplat viewer',u:'https://playcanvas.com/supersplat/editor',t:''},
+      {l:'Connect with Dazai Chen',u:'https://www.linkedin.com/in/dazaichen',t:''}
+    ] },
+
+  { id:'s24', cat:'3dgs', ts:'2026-03-09T07:44', source:'XR AI Spotlight · Wist Labs Shutdown',
+    summary:'Wist Labs — the app that converts videos into 3D spatial memories for Quest and Vision Pro — is shutting down. A reflection on 5 years of building spatial memory tech and what Apple\'s SHARP open-sourcing means for the future.',
+    bullets:['Wist Labs shutting down after 5 years — turns video into 3D spatial memories','Worked on Meta Quest 3 and Apple Vision Pro','Apple open-sourcing SHARP makes this technology inevitable regardless','Founder quote: "spent way too many late nights and weekends away from my family"','Signals how hard consumer XR spatial products are to sustain commercially'],
+    links:[
+      {l:'Wist Labs',u:'https://wistlabs.com',t:'pr'},
+      {l:'Apple ML-Sharp',u:'https://github.com/apple/ml-sharp',t:''},
+      {l:'XR AI Spotlight',u:'https://www.linkedin.com/newsletters/xr-ai-spotlight',t:''}
+    ] },
+
+  { id:'s25', cat:'tools', ts:'2026-03-16T11:48', source:'ComfyUI · Upscaling Model Guide',
+    summary:'Choosing the wrong upscaling model wastes hours re-rendering. ComfyUI benchmarked 20+ workflows across 10 use cases — portraits, product shots, AI video fixes, archival restoration, CGI renders.',
+    bullets:['Wrong creative model = hallucinated label details on product shots','Conservative model = technically accurate but plastic-looking skin','20+ workflows benchmarked across 10 use cases','Every model rated for speed, quality, and when it actually works'],
+    links:[
+      {l:'ComfyUI upscaling guide',u:'https://www.comfy.org',t:'pr'}
+    ] }
+];
+
+// ── STATE ──────────────────────────────────────────────────────────
+let posts = SEED.map(p => ({...p}));
+let activeFilter = 'all';
+let activeView = 'grid';
+let dupResolve = null;
+
+// ── CAT META ───────────────────────────────────────────────────────
+const CAT = {
+  '3dgs':   {lbl:'3D / Gaussian Splat', cls:'c3', color:'var(--g)'},
+  'vp':     {lbl:'Virtual Production',  cls:'cv', color:'var(--b)'},
+  'ai':     {lbl:'AI Workflow',         cls:'ca', color:'var(--p)'},
+  'tools':  {lbl:'Tools',               cls:'ct', color:'var(--y)'},
+  'contact':{lbl:'Contacts',            cls:'cc', color:'var(--r)'},
+};
+const catCls = c => CAT[c]?.cls || 'ca';
+const catLbl = c => CAT[c]?.lbl || c;
+const catClr = c => CAT[c]?.color || '#fff';
+
+// ── TIME FORMAT ────────────────────────────────────────────────────
+function fmt(ts) {
+  try {
+    const d = new Date(ts);
+    return d.toLocaleDateString('en-US',{month:'short',day:'numeric'}) + ' · ' +
+           d.toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'});
+  } catch(e){ return ts; }
+}
+
+// ── RENDER ─────────────────────────────────────────────────────────
+function render() {
+  renderChart();
+  renderStats();
+  renderCards();
+}
+
+function renderStats() {
+  document.getElementById('statPosts').textContent = posts.length;
+  let lc = 0; posts.forEach(p => lc += (p.links||[]).length);
+  document.getElementById('statLinks').textContent = lc;
+}
+
+function renderChart() {
+  const cnt = {}; Object.keys(CAT).forEach(k => cnt[k]=0);
+  posts.forEach(p => { if(cnt[p.cat]!==undefined) cnt[p.cat]++; else cnt[p.cat]=1; });
+  const max = Math.max(...Object.values(cnt), 1);
+  document.getElementById('chartbars').innerHTML = Object.entries(cnt)
+    .sort((a,b)=>b[1]-a[1])
+    .map(([c,n])=>`<div class="brow">
+      <div class="blbl">${catLbl(c)}</div>
+      <div class="btrk"><div class="bfil" style="width:${Math.round(n/max*100)}%;background:${catClr(c)}"></div></div>
+      <div class="bcnt">${n}</div>
+    </div>`).join('');
+}
+
+function renderCards() {
+  const g = document.getElementById('grid');
+  let list = activeFilter==='all' ? posts : posts.filter(p=>p.cat===activeFilter);
+  list = [...list].sort((a,b)=>new Date(b.ts)-new Date(a.ts));
+  if(!list.length){
+    g.innerHTML='<div class="empty"><strong>No posts yet</strong>Drop some LinkedIn screenshots above</div>';
+    return;
+  }
+  g.innerHTML = list.map(p => {
+    const thumb = p.img ? `<img class="cthumb" src="${p.img}" alt="">` : '';
+    const lnks  = (p.links||[]).map(l=>`<a class="lnk ${l.t||''}" href="${l.u}" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation()"><svg width="9" height="9" viewBox="0 0 10 10" fill="none" style="flex-shrink:0"><path d="M1 9L9 1M9 1H4M9 1V6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg> ${l.l}</a>`).join('');
+    const buls  = (p.bullets||[]).slice(0,3).map(b=>`<li>${b}</li>`).join('');
+    return `<div class="card ${catCls(p.cat)}" onclick="openCard('${p.id}')">
+      <button class="cdel" onclick="event.stopPropagation();delCard('${p.id}')">✕</button>
+      ${thumb}
+      <div class="cin">
+        <div class="ctop">
+          <div><div class="csrc">${p.source}</div><div class="ctime">${fmt(p.ts)}</div></div>
+          <span class="ctag ${catCls(p.cat)}">${catLbl(p.cat)}</span>
+        </div>
+        <p class="csum">${p.summary}</p>
+        ${buls?`<ul class="cbul">${buls}</ul>`:''}
+        ${lnks?`<div class="clnks">${lnks}</div>`:''}
+      </div>
+    </div>`;
+  }).join('');
+  g.className = activeView==='list' ? 'lv' : '';
+  // re-set id after className wipe
+  g.id = 'grid';
+}
+
+// ── MODAL ──────────────────────────────────────────────────────────
+function openCard(id) {
+  const p = posts.find(x=>x.id===id); if(!p) return;
+  const img   = p.img ? `<img class="mimg" src="${p.img}" alt="">` : '';
+  const lnks  = (p.links||[]).map(l=>`<a class="lnk ${l.t||''}" href="${l.u}" target="_blank" rel="noopener noreferrer"><svg width="9" height="9" viewBox="0 0 10 10" fill="none" style="flex-shrink:0"><path d="M1 9L9 1M9 1H4M9 1V6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg> ${l.l}</a>`).join('');
+  const buls  = (p.bullets||[]).map(b=>`<li>${b}</li>`).join('');
+  document.getElementById('mbody').innerHTML = `${img}
+    <div class="msrc">${p.source}</div>
+    <div class="mmeta">${catLbl(p.cat)} · ${fmt(p.ts)}</div>
+    <p class="msum">${p.summary}</p>
+    ${buls?`<ul class="mbul">${buls}</ul>`:''}
+    ${lnks?`<div class="mlnks">${lnks}</div>`:''}`;
+  document.getElementById('moverlay').classList.add('on');
+}
+function closeModal(){ document.getElementById('moverlay').classList.remove('on'); }
+
+function delCard(id){ posts=posts.filter(p=>p.id!==id); render(); }
+
+// ── PERCEPTUAL HASH (dHash 8x9) ────────────────────────────────────
+function pHash(dataUrl) {
+  return new Promise(res => {
+    const img = new Image();
+    img.onload = () => {
+      try {
+        const W=9, H=8;
+        const cv = document.createElement('canvas'); cv.width=W; cv.height=H;
+        const ctx = cv.getContext('2d'); ctx.drawImage(img,0,0,W,H);
+        const px  = ctx.getImageData(0,0,W,H).data;
+        const gr  = [];
+        for(let i=0;i<W*H;i++) gr.push(.299*px[i*4]+.587*px[i*4+1]+.114*px[i*4+2]);
+        let bits='';
+        for(let r=0;r<H;r++) for(let c=0;c<W-1;c++) bits+=gr[r*W+c]<gr[r*W+c+1]?'1':'0';
+        let hex='';
+        for(let i=0;i<bits.length;i+=4) hex+=parseInt(bits.slice(i,i+4),2).toString(16);
+        res(hex);
+      } catch(e){ res(''); }
+    };
+    img.onerror=()=>res('');
+    img.src=dataUrl;
+  });
+}
+
+function hamming(a,b){
+  if(!a||!b||a.length!==b.length) return 999;
+  let d=0;
+  for(let i=0;i<a.length;i++) d+=(parseInt(a[i],16)^parseInt(b[i],16)).toString(2).split('1').length-1;
+  return d;
+}
+
+function textSim(a,b){
+  const tok = s=>new Set((s||'').toLowerCase().replace(/[^a-z0-9 ]/g,' ').split(/\s+/).filter(t=>t.length>2));
+  const ta=tok((a.source||'')+' '+(a.summary||'')), tb=tok((b.source||'')+' '+(b.summary||''));
+  if(!ta.size||!tb.size) return 0;
+  let inter=0; ta.forEach(t=>{if(tb.has(t))inter++;});
+  return inter/(ta.size+tb.size-inter);
+}
+
+async function checkDup(cand) {
+  let best={score:0,matchId:null,reasons:[]};
+  for(const ex of posts){
+    const reasons=[];
+    let score=0;
+    if(cand._hash&&ex.imgHash){
+      const d=hamming(cand._hash,ex.imgHash);
+      const s=Math.max(0,1-d/64);
+      if(s>.85) reasons.push('Visual match');
+      score+=s*.6;
+    }
+    const ts=textSim(cand,ex);
+    if(ts>.55) reasons.push('Similar content');
+    score+=ts*.4;
+    if(cand.source&&ex.source&&cand.source.toLowerCase().trim()===ex.source.toLowerCase().trim()){
+      reasons.push('Same source'); score+=.15;
+    }
+    if(score>best.score) best={score,matchId:ex.id,reasons};
+  }
+  return {isDup:best.score>=.55, score:Math.min(best.score,1), matchId:best.matchId, reasons:best.reasons};
+}
+
+// ── DUP DIALOG ─────────────────────────────────────────────────────
+function showDupDialog(incoming, existing, info) {
+  return new Promise(res => {
+    dupResolve = res;
+    const deximg = document.getElementById('deximg');
+    const dnwimg = document.getElementById('dnwimg');
+    deximg.src = existing.img||''; deximg.style.display = existing.img?'block':'none';
+    dnwimg.src = incoming.img||''; dnwimg.style.display = incoming.img?'block':'none';
+    document.getElementById('dexsrc').textContent = existing.source||'—';
+    document.getElementById('dextxt').textContent = (existing.summary||'').slice(0,80)+'…';
+    document.getElementById('dnwsrc').textContent = incoming.source||'—';
+    document.getElementById('dnwtxt').textContent = (incoming.summary||'').slice(0,80)+'…';
+    const pct = Math.round(info.score*100);
+    document.getElementById('dspct').textContent = pct+'%';
+    document.getElementById('dsfil').style.width = pct+'%';
+    document.getElementById('dreasns').innerHTML = (info.reasons||[]).map(r=>`<span class="drtag">${r}</span>`).join('');
+    document.getElementById('dupov').classList.add('on');
+  });
+}
+function closeDup(){ document.getElementById('dupov').classList.remove('on'); }
+
+// ── SERVER-SIDE UPLOAD (Local OCR + MiMo) ────────────────────────
+async function uploadToServer(file) {
+  const formData = new FormData();
+  formData.append('file', file);
+  const r = await fetch('/api/upload.php', { method: 'POST', body: formData });
+  if (!r.ok) throw new Error('Upload failed: ' + r.status);
+  const data = await r.json();
+  if (data.error) throw new Error(data.error);
+  return data;
+}
+
+// ── HANDLE FILES ───────────────────────────────────────────────────
+async function handleFiles(files) {
+  const bar = document.getElementById('abar');
+  const txt = document.getElementById('atxt');
+  bar.classList.add('on');
+
+  for(let i=0;i<files.length;i++){
+    const file = files[i];
+    txt.textContent = `Processing ${i+1}/${files.length}: ${file.name} (OCR + MiMo)…`;
+    try {
+      const newPost = await uploadToServer(file);
+      posts.unshift(newPost);
+      render();
+    } catch(err){ console.error(file.name, err); }
+  }
+  bar.classList.remove('on');
+}
+
+// ── WIRE UP ────────────────────────────────────────────────────────
+(function init(){
+  // Upload zone
+  const zone = document.getElementById('upzone');
+  const fin  = document.getElementById('filein');
+  zone.addEventListener('click', ()=>fin.click());
+  fin.addEventListener('change', e=>{ if(e.target.files.length) handleFiles([...e.target.files]); fin.value=''; });
+  zone.addEventListener('dragover', e=>{ e.preventDefault(); zone.classList.add('drag'); });
+  zone.addEventListener('dragleave', ()=>zone.classList.remove('drag'));
+  zone.addEventListener('drop', e=>{
+    e.preventDefault(); zone.classList.remove('drag');
+    const fs=[...e.dataTransfer.files].filter(f=>f.type.startsWith('image/'));
+    if(fs.length) handleFiles(fs);
+  });
+
+  // Filter buttons
+  document.querySelectorAll('.fbtn').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      document.querySelectorAll('.fbtn').forEach(b=>b.classList.remove('on'));
+      btn.classList.add('on');
+      activeFilter=btn.dataset.cat;
+      renderCards();
+    });
+  });
+
+  // View toggle
+  document.getElementById('vgrid').addEventListener('click', ()=>{
+    activeView='grid';
+    document.getElementById('vgrid').classList.add('on');
+    document.getElementById('vlist').classList.remove('on');
+    renderCards();
+  });
+  document.getElementById('vlist').addEventListener('click', ()=>{
+    activeView='list';
+    document.getElementById('vlist').classList.add('on');
+    document.getElementById('vgrid').classList.remove('on');
+    renderCards();
+  });
+
+  // Modal close
+  document.getElementById('mclose').addEventListener('click', closeModal);
+  document.getElementById('moverlay').addEventListener('click', e=>{ if(e.target.id==='moverlay') closeModal(); });
+  document.addEventListener('keydown', e=>{ if(e.key==='Escape'){ closeModal(); closeDup(); } });
+
+  // Dup dialog
+  document.getElementById('dskip').addEventListener('click', ()=>{ closeDup(); if(dupResolve){dupResolve(false);dupResolve=null;} });
+  document.getElementById('dadd').addEventListener('click',  ()=>{ closeDup(); if(dupResolve){dupResolve(true); dupResolve=null;} });
+
+  // Expose for inline onclick
+  window.openCard = openCard;
+  window.delCard  = delCard;
+
+  render();
+})();
+</script>
+</body>
+</html>
