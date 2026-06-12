@@ -56,19 +56,17 @@ try {
     $bullets = [];
     $links = [];
 
-    // STEP 1: Local OCR via Ollama vision model
-    $extractedText = ocrWithOllama($imageData, $file['type']);
+    // STEP 1: Local OCR via Ollama vision model (moondream)
+    $extractedText = ocrWithOllama($imageData);
 
     if ($extractedText) {
-        // STEP 2: Structure into card via MiMo (OpenRouter)
-        $result = structureWithMiMo($extractedText);
-        if ($result) {
-            $source = $result['source'] ?? $source;
-            $cat = $result['cat'] ?? $cat;
-            $summary = $result['summary'] ?? $summary;
-            $bullets = $result['bullets'] ?? [];
-            $links = $result['links'] ?? [];
-        }
+        // STEP 2: Parse OCR text into card structure (no LLM needed)
+        $parsed = parseOcrToCard($extractedText);
+        $source = $parsed['source'] ?? $source;
+        $cat = $parsed['cat'] ?? $cat;
+        $summary = $parsed['summary'] ?? $summary;
+        $bullets = $parsed['bullets'] ?? [];
+        $links = $parsed['links'] ?? [];
     }
 
     $pdo = getDB();
@@ -93,15 +91,15 @@ try {
 
 
 // ══════════════════════════════════════════════════════════════════════
-// STEP 1: Local OCR via Ollama Vision Model
+// STEP 1: Local OCR via Ollama Vision Model (moondream)
 // ══════════════════════════════════════════════════════════════════════
 
-function ocrWithOllama($imageData, $mimeType) {
+function ocrWithOllama($imageData) {
     $b64 = base64_encode($imageData);
 
     $payload = [
         'model' => VISION_MODEL,
-        'prompt' => 'Read all text in this LinkedIn screenshot. Extract every piece of text visible: author name, post content, any links, hashtags, dates, follower counts. Return the raw text exactly as it appears, preserving line breaks. Do not summarize or reformat.',
+        'prompt' => 'What text and information do you see in this image? Include author name, post content, links, hashtags, and any other visible text.',
         'images' => [$b64],
         'stream' => false,
         'options' => [
@@ -151,70 +149,159 @@ function ocrWithOllama($imageData, $mimeType) {
 
 
 // ══════════════════════════════════════════════════════════════════════
-// STEP 2: Structure extracted text into card via MiMo (OpenRouter)
+// STEP 2: Parse OCR text into card structure (no LLM)
 // ══════════════════════════════════════════════════════════════════════
 
-function structureWithMiMo($extractedText) {
-    $apiKey = OPENROUTER_API_KEY;
-    if (empty($apiKey) || strlen($apiKey) < 10) {
-        error_log("MiMo API key not configured");
-        return null;
-    }
+function parseOcrToCard($text) {
+    $lines = array_filter(array_map('trim', explode("\n", $text)));
+    $fullText = implode(' ', $lines);
 
-    $prompt = "You are a LinkedIn post analyst. Given the raw text extracted from a LinkedIn screenshot, structure it into a JSON card.\n\nEXTRACTED TEXT:\n---\n" . $extractedText . "\n---\n\nReturn ONLY valid JSON with this exact structure (no markdown, no backticks, no explanation):\n{\n  \"source\": \"Person/Company name . role/followers if shown\",\n  \"cat\": \"3dgs|vp|ai|tools|contact\",\n  \"summary\": \"2-3 sentences about the post\",\n  \"bullets\": [\"key point 1\", \"key point 2\"],\n  \"links\": [{\"l\":\"label\",\"u\":\"URL\",\"t\":\"\"}]\n}\n\nCategories:\n- 3dgs = Gaussian Splatting, 3D reconstruction, 4DGS, NeRF, point clouds\n- vp = Virtual Production, Unreal Engine, LED stages, real-time rendering, in-camera VFX\n- ai = AI, machine learning, ComfyUI, LLMs, agents, diffusion models\n- tools = Software, plugins, apps, SDKs, services, developer tools\n- contact = Direct messages, networking, people connections\n\nLink types (t field): \"pr\" = product/official, \"co\" = contact/email, \"\" = other\n\nIf the text is unreadable or not a LinkedIn post, return:\n{\"source\":\"Unable to read\",\"cat\":\"ai\",\"summary\":\"Could not read post content.\",\"bullets\":[],\"links\":[]}";
+    // Extract source (first line or first sentence with name/title patterns)
+    $source = extractSource($lines, $fullText);
 
-    $payload = [
-        'model' => CARD_MODEL,
-        'max_tokens' => 800,
-        'messages' => [
-            ['role' => 'user', 'content' => $prompt]
-        ]
+    // Extract category based on keywords
+    $cat = detectCategory($fullText);
+
+    // Extract summary (first 2-3 meaningful sentences)
+    $summary = extractSummary($fullText);
+
+    // Extract bullet points (key sentences)
+    $bullets = extractBullets($fullText);
+
+    // Extract links
+    $links = extractLinks($fullText);
+
+    return [
+        'source' => $source,
+        'cat' => $cat,
+        'summary' => $summary,
+        'bullets' => $bullets,
+        'links' => $links
     ];
+}
 
-    $ch = curl_init('https://openrouter.ai/api/v1/chat/completions');
-    curl_setopt_array($ch, [
-        CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_HTTPHEADER => [
-            'Content-Type: application/json',
-            'Authorization' => 'Bearer ' . $apiKey,
-            'HTTP-Referer: https://links.steadiczech.com'
-        ],
-        CURLOPT_POST => true,
-        CURLOPT_POSTFIELDS => json_encode($payload),
-        CURLOPT_TIMEOUT => 30
-    ]);
-
-    $response = curl_exec($ch);
-    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-    $curlError = curl_error($ch);
-    curl_close($ch);
-
-    if ($curlError) {
-        error_log("MiMo curl error: $curlError");
-        return null;
+function extractSource($lines, $text) {
+    // Try first line as author (if it looks like a name)
+    if (!empty($lines[0])) {
+        $first = $lines[0];
+        if (strlen($first) > 3 && strlen($first) < 100 && !preg_match('/^(image|photo|screenshot|linkedin|the )/i', $first)) {
+            return $first;
+        }
     }
 
-    if ($httpCode !== 200) {
-        error_log("MiMo API error: $httpCode - $response");
-        return null;
+    // Handle moondream descriptive output: "reads 'John Smith'" or "says 'John Smith'"
+    if (preg_match('/(?:reads?|says?|header|from|posted by|authored by|written by)[:\s]+["\']?([A-Z][a-z]+ [A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)/i', $text, $m)) {
+        return $m[1];
     }
 
-    $decoded = json_decode($response, true);
-    if (!$decoded || !isset($decoded['choices'][0]['message']['content'])) {
-        error_log("MiMo response decode failed");
-        return null;
+    // Find "Name followed by" or "Name announces" pattern
+    if (preg_match('/([A-Z][a-z]+ [A-Z][a-z]+)\s+(?:followed|announces|announced|shares|shared|posts|posted|writes|wrote|says|said)/i', $text, $m)) {
+        return $m[1];
     }
 
-    $text = $decoded['choices'][0]['message']['content'];
-    $text = str_replace(['```json', '```'], '', $text);
-    $text = trim($text);
-
-    $parsed = json_decode($text, true);
-    if (!$parsed) {
-        error_log("MiMo JSON parse failed: " . substr($text, 0, 200));
-        return null;
+    // Try "Name · Title" or "Name at Company" pattern
+    if (preg_match('/^([A-Z][a-z]+ [A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)\s*(?:·|at|@|—|-)\s*(.+)/', $text, $m)) {
+        return trim($m[1] . ' · ' . $m[2]);
     }
 
-    return $parsed;
+    // Try "Name, Title" pattern
+    if (preg_match('/([A-Z][a-z]+ [A-Z][a-z]+),\s*(?:VP|CEO|CTO|Director|Manager|Engineer|Lead|Head|Chief|Sr\.|Jr\.|Dr\.|Prof\.|Mr\.|Ms\.|Chief)/i', $text, $m)) {
+        return $m[1];
+    }
+
+    // Generic two-word name at start
+    if (preg_match('/^([A-Z][a-z]+ [A-Z][a-z]+)/', $text, $m)) {
+        return $m[1];
+    }
+
+    return 'User Upload';
+}
+
+function detectCategory($text) {
+    $text = strtolower($text);
+
+    // 3DGS keywords
+    if (preg_match('/gaussian|splat|3dgs|4dgs|nerf|point.?cloud|colmap|mesh|3d.?reconstruct/i', $text)) {
+        return '3dgs';
+    }
+
+    // VP keywords
+    if (preg_match('/virtual.?prod|unreal|led.?stage|icvfx|in.?camera|nDisplay|stagecraft|volume/i', $text)) {
+        return 'vp';
+    }
+
+    // Tools keywords
+    if (preg_match('/comfyui|blender|unity|houdini|mayа|plugin|sdk|app.?store|github\.com/i', $text)) {
+        return 'tools';
+    }
+
+    // Contact keywords
+    if (preg_match('/dm|message|connect|networking|met at|follow|endorse/i', $text)) {
+        return 'contact';
+    }
+
+    // AI keywords (default fallback)
+    if (preg_match('/ai|machine.?learn|llm|diffusion|model|neural|deep.?learn|gpt|claude|gemini/i', $text)) {
+        return 'ai';
+    }
+
+    return 'ai';
+}
+
+function extractSummary($text) {
+    // Split into sentences
+    $sentences = preg_split('/(?<=[.!?])\s+/', $text, -1, PREG_SPLIT_NO_EMPTY);
+
+    $summary = [];
+    foreach ($sentences as $s) {
+        $s = trim($s);
+        // Skip very short or generic sentences
+        if (strlen($s) < 15) continue;
+        if (preg_match('/^(image|photo|screenshot|see|click|view)/i', $s)) continue;
+
+        $summary[] = $s;
+        if (count($summary) >= 3) break;
+    }
+
+    return !empty($summary) ? implode(' ', $summary) : substr($text, 0, 200);
+}
+
+function extractBullets($text) {
+    $sentences = preg_split('/(?<=[.!?])\s+/', $text, -1, PREG_SPLIT_NO_EMPTY);
+    $bullets = [];
+
+    foreach ($sentences as $s) {
+        $s = trim($s);
+        if (strlen($s) < 20) continue;
+        if (preg_match('/^(image|photo|screenshot|see|click|view|the |a |an )/i', $s)) continue;
+
+        $bullets[] = $s;
+        if (count($bullets) >= 5) break;
+    }
+
+    return $bullets;
+}
+
+function extractLinks($text) {
+    $links = [];
+
+    // Match URLs
+    if (preg_match_all('/(https?:\/\/[^\s<>\"\']+)/i', $text, $m)) {
+        foreach ($m[1] as $url) {
+            $url = rtrim($url, '.,;:)');
+            $links[] = ['l' => parse_url($url, PHP_URL_HOST) ?: $url, 'u' => $url, 't' => ''];
+        }
+    }
+
+    // Match "www." URLs
+    if (preg_match_all('/(www\.[^\s<>\"\']+)/i', $text, $m)) {
+        foreach ($m[1] as $url) {
+            $url = rtrim($url, '.,;:)');
+            if (strpos($url, 'http') !== 0) $url = 'https://' . $url;
+            $links[] = ['l' => parse_url($url, PHP_URL_HOST) ?: $url, 'u' => $url, 't' => ''];
+        }
+    }
+
+    return $links;
 }
 ?>
