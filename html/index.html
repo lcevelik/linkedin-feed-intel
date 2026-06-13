@@ -674,7 +674,7 @@ function openCard(id) {
 }
 function closeModal(){ document.getElementById('moverlay').classList.remove('on'); }
 
-function delCard(id){ posts=posts.filter(p=>p.id!==id); render(); }
+function delCard(id){ posts=posts.filter(p=>p.id!==id); render(); fetch("/api/posts.php?id="+id,{method:"DELETE"}).catch(()=>{}); }
 
 // ── PERCEPTUAL HASH (dHash 8x9) ────────────────────────────────────
 function pHash(dataUrl) {
